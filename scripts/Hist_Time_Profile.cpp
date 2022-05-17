@@ -268,13 +268,13 @@ std::vector<TH1D*> PlotHitTimeResidualsMCPosition_individual( const std::string&
 
         if (name == "e+") {  // is a positron
           if (verbose) {std::cout << "Found e+ in track " << itrack << std::endl;}
+          if (verbose) {std::cout << "track_ids.at(itrack) = " << track_ids.at(itrack) << std::endl;}
           if (mctrack.GetParentID() == 0) {  // has no parent track/particle
 
             // Loop through steps in track
             size_t numSteps = mctrack.GetMCTrackStepCount();
             for (unsigned int istep = 0; istep < (unsigned int)numSteps; istep++) {
               RAT::DS::MCTrackStep& mcTrackStep = mctrack.GetMCTrackStep(istep);
-              if (verbose) {std::cout << mcTrackStep.GetProcess() << std::endl;}
 
               // Check e+ dies in annihilation
               if (mcTrackStep.GetProcess() == "annihil") {
