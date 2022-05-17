@@ -270,19 +270,19 @@ std::vector<TH1D*> PlotHitTimeResidualsMCPosition_individual( const std::string&
           if (verbose) {std::cout << "Found e+ in track " << itrack << std::endl;}
           if (mctrack.GetParentID() == 0) {  // has no parent track/particle
 
-            // Get last step in track
-            std::cout << "1" << std::endl;
+            // Loop through steps in track
             size_t numSteps = mctrack.GetMCTrackStepCount();
-            RAT::DS::MCTrackStep& mcTrackStep = mctrack.GetMCTrackStep(numSteps - 1);
-            std::cout << "2" << std::endl;
-            if (verbose) {std::cout << mcTrackStep.GetProcess() << std::endl;}
+            for (unsigned int istep = 0; istep < (unsigned int)numSteps; istep++) {
+              RAT::DS::MCTrackStep& mcTrackStep = mctrack.GetMCTrackStep(istep);
+              if (verbose) {std::cout << mcTrackStep.GetProcess() << std::endl;}
 
-            // Check e+ dies in annihilation
-            if (mcTrackStep.GetProcess() == "annihil") {
-              // Time of last step of e+ track (approx time of annihilation, I hope)
-              std::cout << "3" << std::endl;
-              annihilTime = mcTrackStep.GetGlobalTime();
-              posi_track = track_ids.at(itrack);
+              // Check e+ dies in annihilation
+              if (mcTrackStep.GetProcess() == "annihil") {
+                // Time of last step of e+ track (approx time of annihilation, I hope)
+                if (verbose) {std::cout<< "got annihil process for step " << istep << std::endl;}
+                annihilTime = mcTrackStep.GetGlobalTime();
+                posi_track = track_ids.at(itrack);
+              }
             }
           }
         }
