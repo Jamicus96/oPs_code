@@ -109,16 +109,17 @@ def find_secondaries(filename):
         for child in range(0, cursor.ChildCount()):
             cursor.GoChild(child)
 
-            # Step along particle track
-            while not cursor.IsTrackEnd():
-                node = cursor.Here()
-                # if cursor.ChildCount():
-                #     print(node.GetProcess())
-                cursor.GoNext()
+            # # Step along particle track
+            # while not cursor.IsTrackEnd():
+            #     node = cursor.Here()
+            #     if cursor.ChildCount():
+            #         print(node.GetProcess())
+            #     cursor.GoNext()
 
-                if cursor.IsTrackEnd():
-                    print(node.GetProcess())
-                    
+            cursor.GoTrackEnd()
+            node = cursor.Here()
+            print(node.GetProcess())
+
             cursor.GoTrackStart()
             cursor.GoParent()
 
