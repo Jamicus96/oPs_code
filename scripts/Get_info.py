@@ -113,11 +113,14 @@ def find_secondaries(filename):
             i = 0
             while not cursor.IsTrackEnd():
                 node = cursor.Here()
-                if cursor.ChildCount():
+                has_children = cursor.ChildCount()
+                if has_children:
                     print(node.GetProcess())
                     print('Step = ', i)
                 cursor.GoNext()
                 i += 1
+                if has_children:
+                    print('Is track end: ', cursor.IsTrackEnd())
 
             cursor.GoTrackStart()
             cursor.GoParent()
