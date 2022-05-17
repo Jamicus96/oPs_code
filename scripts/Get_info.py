@@ -110,11 +110,14 @@ def find_secondaries(filename):
             cursor.GoChild(child)
 
             # Step along particle track
+            i = 0
             while not cursor.IsTrackEnd():
                 node = cursor.Here()
                 if cursor.ChildCount():
                     print(node.GetProcess())
+                    print('Step = ', i)
                 cursor.GoNext()
+                i += 1
 
             cursor.GoTrackStart()
             cursor.GoParent()
