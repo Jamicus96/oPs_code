@@ -109,43 +109,45 @@ int main(int argc, char** argv) {
 std::vector<double> findPositronDelays(const std::string& filename, bool verbose) {
   if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
 
-  RAT::DU::DSReader reader(filename);
+  RAT::DU::DSReader dsReader(filename);
   std::vector<double> delays;
 
   // Loop through events. Each one should have one primary track (first child) in MC
   if (verbose) {std::cout << "Looping through events..." << std::endl;}
-  for (size_t iEv =0; iEv<reader.GetEntryCount(); iEv++) {
-    const RAT::DS::Entry& ds = reader.GetEntry(iEv);
-    RAT::TrackNav nav(&ds);
+  for (size_t iEv =0; iEv<dsReader.GetEntryCount(); iEv++) {
+    const RAT::DS::Entry& rDS = dsReader.GetEntry(iEv);
+    RAT::TrackNav nav(&rDS);
     RAT::TrackCursor cursor = nav.Cursor(false);
 
-    // Should only go through this loop once in MC.
-    for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
-      cursor.GoChild(iCh);
+    // Check there is an event in this entry (won't get associated t_res plot if not)
+    if (rDS.GetEVCount() > 0) {
+      // Should only go through this loop once in MC.
+      for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
+        cursor.GoChild(iCh);
 
-      // Go to the end of the e+ track
-      cursor.GoTrackEnd();
-      RAT::TrackNode* parent_node = cursor.Here();
-      double start_time = parent_node->GetGlobalTime();
-      if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
-      if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
+        // Go to the end of the e+ track
+        cursor.GoTrackEnd();
+        RAT::TrackNode* parent_node = cursor.Here();
+        double start_time = parent_node->GetGlobalTime();
+        if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
+        if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
 
-      // Go to the start of the first child track (gamma)
-      cursor.GoChild(0);
-      RAT::TrackNode* child_node = cursor.Here();
-      double end_time = child_node->GetGlobalTime();
-      delays.push_back(end_time - start_time);
-      if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
-      if (verbose) {std::cout << "e+ delay: " << end_time - start_time << std::endl;}
+        // Go to the start of the first child track (gamma)
+        cursor.GoChild(0);
+        RAT::TrackNode* child_node = cursor.Here();
+        double end_time = child_node->GetGlobalTime();
+        delays.push_back(end_time - start_time);
+        if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
+        if (verbose) {std::cout << "e+ delay: " << end_time - start_time << std::endl;}
 
-      // Go back to e+ track
-      cursor.GoParent();
+        // Go back to e+ track
+        cursor.GoParent();
 
-      // Go back to parent node to redo loop
-      cursor.GoTrackStart();
-      cursor.GoParent();
-    } //Primary Particle Tracks
-
+        // Go back to parent node to redo loop
+        cursor.GoTrackStart();
+        cursor.GoParent();
+      } //Primary Particle Tracks
+    }
   } //event
 
   return delays;
