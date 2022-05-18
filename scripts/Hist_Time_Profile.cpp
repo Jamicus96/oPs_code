@@ -26,6 +26,11 @@
 #include <RAT/DS/PMT.hh>
 #include <RAT/DS/FitResult.hh>
 
+#include <RAT/TrackNav.hh>
+#include <RAT/TrackCursor.hh>
+#include <RAT/TrackNode.hh>
+#include <RAT/DB.hh>
+
 #include <TH1D.h>
 #include <TCanvas.h>
 #include <TLegend.h>
@@ -35,7 +40,7 @@
 
 #include <string>
 
-std::vector<double> findPositronDelays(const std::string& filename, bool verbose)
+std::vector<double> findPositronDelays(const std::string& filename, bool verbose);
 TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, bool verbose);
 std::vector<TH1D*> PlotHitTimeResidualsMCPosition_individual(const std::string& fileName, bool verbose);
 TH1D* PlotHitTimeResidualsFitPosition(const std::string& fileName, bool verbose, std::string fitName = "");
@@ -47,7 +52,7 @@ int main(int argc, char** argv) {
 
   // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
   if (verbose) {std::cout << "Getting hists..." << std::endl;}
-  TH1D* MC_hist = PlotHitTimeResidualsMCPosition(file, verbose);
+  TH1D* MC_summed_hist = PlotHitTimeResidualsMCPosition(file, verbose);
   std::vector<TH1D*> evt_hists = PlotHitTimeResidualsMCPosition_individual(file, verbose);
   // TH1D* raw_hist = PlotHitTimeResidualsFitPosition(file, verbose);
 
@@ -56,11 +61,19 @@ int main(int argc, char** argv) {
 
   // Check list of hists and delays are the same length
   if (delays.size() == evt_hists.size()) {
+    std::string title;
+    double mean_delay = 0.0;
     // Write delay to appropriate title
     for (unsigned int i = 0; i < evt_hists.size(); ++i) {
-      std::string title = "Hit time residuals using the MC position, and o-Ps delay = " + std::to_string(delays.at(i));
+      title = "Hit time residuals using the MC position, and o-Ps delay = " + std::to_string(delays.at(i)) + " ns";
       evt_hists.at(i)->SetTitle(title.c_str());
+      // While here, compute mean delay (just for extra info)
+      mean_delay += (delays.at(i) - mean_delay) / (i + 1);
     }
+    // Set summed hist title too
+    title = "Hit time residuals using the MC position, summed over " + std::to_string(evt_hists.size())
+                      + " events, and mean o-Ps delay = " + std::to_string(mean_delay) + " ns";
+    MC_summed_hist->SetTitle(title.c_str());
   } else {
     std::cout << "delay and hist lists of different lengths: delays_len = " <<  delays.size()
               << ", hists_len = " << evt_hists.size() << std::endl;
@@ -76,7 +89,7 @@ int main(int argc, char** argv) {
   // Now write everything to the file and close
   if (verbose) {std::cout << "Writing everything to file and closing" << std::endl;}
   rootfile->cd();
-  MC_hist->Write();
+  MC_summed_hist->Write();
   for (int i = 0; i < evt_hists.size(); ++i) {
     evt_hists.at(i)->Write();
   }
@@ -108,29 +121,29 @@ std::vector<double> findPositronDelays(const std::string& filename, bool verbose
 
     // Should only go through this loop once in MC.
     for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
-      cursor.GoChild(child);
+      cursor.GoChild(iCh);
 
       // Go to the end of the e+ track
       cursor.GoTrackEnd();
-      RAT::TrackNode* node = cursor.Here();
-      double start_time = node.GetGlobalTime();
-      if (verbose) {std::cout << "Parent particle: " << node.GetParticleName() << std::endl;}
-      if (verbose) {std::cout << "Last step process: " << node.GetProcess() << std::endl;}
+      RAT::TrackNode* parent_node = cursor.Here();
+      double start_time = parent_node->GetGlobalTime();
+      if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
+      if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
 
       // Go to the start of the first child track (gamma)
       cursor.GoChild(0);
-      RAT::TrackNode* node = cursor.Here();
-      double end_time = node.GetGlobalTime();
+      RAT::TrackNode* child_node = cursor.Here();
+      double end_time = child_node->GetGlobalTime();
       delays.push_back(end_time - start_time);
-      if (verbose) {std::cout << "Child particle: " << node.GetParticleName() << std::endl;}
+      if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
       if (verbose) {std::cout << "e+ delay: " << end_time - start_time << std::endl;}
 
       // Go back to e+ track
-      cursor.GoParent()
+      cursor.GoParent();
 
       // Go back to parent node to redo loop
-      cursor.GoTrackStart()
-      cursor.GoParent()
+      cursor.GoTrackStart();
+      cursor.GoParent();
     } //Primary Particle Tracks
 
   } //event
