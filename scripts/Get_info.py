@@ -25,28 +25,22 @@ from __future__ import division
 import ROOT
 import rat
 import argparse
+import numpy as np
 
 def set_parser():
     # Define arguments
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description='Input args')
-
     parser.add_argument('--sim_file', '-f', type=str, default=None,
                         dest='sim_file', required=True,
                         help='Root file from simulation')
-    parser.add_argument('--which_func', '-w', type=int, default=None,
-                        choices=[0, 1, 2],
-                        dest='which_func', required=True,
-                        help='Which function to run')
-
     return parser.parse_args()
 
 def main():
     args = set_parser()
 
-    functions = [plot_primary_mom, plot_primary1_disp, find_secondaries]
-
     # Run desired function
-    functions[args.which_func](args.sim_file)
+    delays = find_positron_delays(args.sim_file)
+    print(delays)
 
 
 def plot_primary_mom(filename):
@@ -95,33 +89,43 @@ def plot_primary1_disp(filename):
 
     return hist
 
-def find_secondaries(filename):
+def find_positron_delays(filename):
     """ Find the processes with secondaries.
 
     :param file_name: Path to the RAT DS file
     """
     # event loop
+    delays = []
     for ds, _ in rat.dsreader(filename):
         nav = ROOT.RAT.TrackNav(ds)
         cursor = nav.Cursor()
 
         # primary particle loop
-        for child in range(0, cursor.ChildCount()):
+        for child in range(0, cursor.ChildCount()):  # Should only be one child: the e+
             cursor.GoChild(child)
 
-            # # Step along particle track
-            # while not cursor.IsTrackEnd():
-            #     node = cursor.Here()
-            #     if cursor.ChildCount():
-            #         print(node.GetProcess())
-            #     cursor.GoNext()
-
+            # Go to the end of the e+ track
             cursor.GoTrackEnd()
             node = cursor.Here()
-            print(node.GetProcess())
+            #print(node.GetParticleName())
+            #print(node.GetProcess())
+            start_time = node.GetGlobalTime()
 
+            # Go to the start of the first child track (gamma)
+            cursor.GoChild(0)
+            node = cursor.Here()
+            #print(node.GetParticleName())
+            end_time = node.GetGlobalTime()
+            #print(end_time - start_time)
+            delays.append(end_time - start_time)
+
+            # Go back to e+ track
+            cursor.GoParent()
+
+            # Go back to parent node to redo loop
             cursor.GoTrackStart()
             cursor.GoParent()
+    return np.array(delays)
 
 
 if __name__ == '__main__':

@@ -35,12 +35,13 @@
 
 #include <string>
 
+std::vector<double> findPositronDelays(const std::string& filename, bool verbose)
 TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, bool verbose);
 std::vector<TH1D*> PlotHitTimeResidualsMCPosition_individual(const std::string& fileName, bool verbose);
 TH1D* PlotHitTimeResidualsFitPosition(const std::string& fileName, bool verbose, std::string fitName = "");
 // void PlotHitTimeResiduals(const std::string& fileName);
 
-int main(int argc, char** argv){
+int main(int argc, char** argv) {
   std::string file = argv[1];
   bool verbose = argv[2];
 
@@ -49,6 +50,21 @@ int main(int argc, char** argv){
   TH1D* MC_hist = PlotHitTimeResidualsMCPosition(file, verbose);
   std::vector<TH1D*> evt_hists = PlotHitTimeResidualsMCPosition_individual(file, verbose);
   // TH1D* raw_hist = PlotHitTimeResidualsFitPosition(file, verbose);
+
+  // Get e+ delays
+  std::vector<double> delays = findPositronDelays(file, verbose);
+
+  // Check list of hists and delays are the same length
+  if (delays.size() == evt_hists.size()) {
+    // Write delay to appropriate title
+    for (unsigned int i = 0; i < evt_hists.size(); ++i) {
+      std::string title = "Hit time residuals using the MC position, and o-Ps delay = " + std::to_string(delays.at(i));
+      evt_hists.at(i)->SetTitle(title.c_str());
+    }
+  } else {
+    std::cout << "delay and hist lists of different lengths: delays_len = " <<  delays.size()
+              << ", hists_len = " << evt_hists.size() << std::endl;
+  }
 
   // Create output file
   if (verbose) {std::cout << "Creating output file" << std::endl;}
@@ -71,11 +87,62 @@ int main(int argc, char** argv){
   return 0;
 }
 
+/**
+ * @brief Returns a list of the delays imparted to positron decays (emulating oPs)
+ * 
+ * @param filename 
+ * @return std::vector<double> 
+ */
+std::vector<double> findPositronDelays(const std::string& filename, bool verbose) {
+  if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
+
+  RAT::DU::DSReader reader(filename);
+  std::vector<double> delays;
+
+  // Loop through events. Each one should have one primary track (first child) in MC
+  if (verbose) {std::cout << "Looping through events..." << std::endl;}
+  for (size_t iEv =0; iEv<reader.GetEntryCount(); iEv++) {
+    const RAT::DS::Entry& ds = reader.GetEntry(iEv);
+    RAT::TrackNav nav(&ds);
+    RAT::TrackCursor cursor = nav.Cursor(false);
+
+    // Should only go through this loop once in MC.
+    for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
+      cursor.GoChild(child);
+
+      // Go to the end of the e+ track
+      cursor.GoTrackEnd();
+      RAT::TrackNode* node = cursor.Here();
+      double start_time = node.GetGlobalTime();
+      if (verbose) {std::cout << "Parent particle: " << node.GetParticleName() << std::endl;}
+      if (verbose) {std::cout << "Last step process: " << node.GetProcess() << std::endl;}
+
+      // Go to the start of the first child track (gamma)
+      cursor.GoChild(0);
+      RAT::TrackNode* node = cursor.Here();
+      double end_time = node.GetGlobalTime();
+      delays.push_back(end_time - start_time);
+      if (verbose) {std::cout << "Child particle: " << node.GetParticleName() << std::endl;}
+      if (verbose) {std::cout << "e+ delay: " << end_time - start_time << std::endl;}
+
+      // Go back to e+ track
+      cursor.GoParent()
+
+      // Go back to parent node to redo loop
+      cursor.GoTrackStart()
+      cursor.GoParent()
+    } //Primary Particle Tracks
+
+  } //event
+
+  return delays;
+}
+
 /// Plot the hit time residuals for the MC position
 ///
 /// @param[in] fileName of the RAT::DS root file to analyse
 /// @return the histogram plot
-TH1D* PlotHitTimeResidualsMCPosition( const std::string& fileName , bool verbose) {
+TH1D* PlotHitTimeResidualsMCPosition( const std::string& fileName, bool verbose) {
   if (verbose) {std::cout << "Running PlotHitTimeResidualsMCPosition()" << std::endl;}
 
   TH1D* hHitTimeResiduals = new TH1D( "hHitTimeResidualsMC", "Hit time residuals using the MC position", 1000, -10.0, 500.0 );
@@ -252,90 +319,40 @@ std::vector<TH1D*> PlotHitTimeResidualsMCPosition_individual( const std::string&
 
   if (verbose) {std::cout << "Looping through entries..." << std::endl;}
   for(size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); iEntry++) {
+    /* ~~~~~~~ MCEV info: position ~~~~~~~ */
 
-      /* ~~~~~~~ MCEV info: position and delay ~~~~~~~ */
+    const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
+    const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
+    std::vector<unsigned int> track_ids = rDS.GetMC().GetMCTrackIDs();
 
-      const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
-      const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
-      std::vector<unsigned int> track_ids = rDS.GetMC().GetMCTrackIDs();
+    /* ~~~~~~~ EV info: events and PMT hits ~~~~~~~ */
 
-      // Find first track that is a positron
-      Double_t annihilTime = -1.0;
-      int posi_track = -1;
-      for (unsigned int itrack = 0; itrack < track_ids.size(); itrack++) {
-        RAT::DS::MCTrack mctrack = rDS.GetMC().GetMCTrack(track_ids.at(itrack));
-        std::string name = mctrack.GetParticleName();
+    for(size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
+      const RAT::DS::EV& rEV = rDS.GetEV(iEV);
+      const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
+      std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(counter);
+      std::string title = "Hit time residuals using the MC position";
+      
+      evt_hists.push_back(new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0));
+      for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+          const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
 
-        if (name == "e+") {  // is a positron
-          if (verbose) {std::cout << "Found e+ in track " << itrack << std::endl;}
-          if (verbose) {std::cout << "track_ids.at(itrack) = " << track_ids.at(itrack) << std::endl;}
-          if (mctrack.GetParentID() == 0) {  // has no parent track/particle
+          lightPath.CalcByPosition(eventPosition, pmtInfo.GetPosition(pmtCal.GetID()));
+          double distInInnerAV = lightPath.GetDistInInnerAV();
+          double distInAV = lightPath.GetDistInAV();
+          double distInWater = lightPath.GetDistInWater();
 
-            // Loop through steps in track
-            size_t numSteps = mctrack.GetMCTrackStepCount();
-            for (unsigned int istep = 0; istep < (unsigned int)numSteps; istep++) {
-              RAT::DS::MCTrackStep& mcTrackStep = mctrack.GetMCTrackStep(istep);
-
-              // Check e+ dies in annihilation
-              if (mcTrackStep.GetProcess() == "annihil") {
-                // Time of last step of e+ track (approx time of annihilation, I hope)
-                if (verbose) {std::cout<< "got annihil process for step " << istep << std::endl;}
-                annihilTime = mcTrackStep.GetGlobalTime();
-                posi_track = track_ids.at(itrack);
-              }
-            }
-          }
-        }
+          const double transitTime = groupVelocity.CalcByDistance( distInInnerAV, distInAV, distInWater ); // Assumes a 400nm photon
+          // Time residuals estimate the photon emission time relative to the event start so subtract off the transit time
+          // hit times are relative to the trigger time, which will depend on event time and detector position so correct for that to line up events
+          // The 390ns corrects for the electronics delays and places the pulse in the middle of the window
+          evt_hists.at(counter)->Fill( pmtCal.GetTime() - transitTime - 390 + rDS.GetMCEV(iEV).GetGTTime());
       }
-
-      Double_t delay = 0.0;
-      // If a positron that annihilated was found...
-      if (posi_track != -1) {
-        // Loop through the tracks to find child gamma track with latest creation time
-        Double_t creationTime = annihilTime;
-        Double_t tempTime;
-        for (unsigned int itrack = 0; itrack < track_ids.size(); itrack++) {
-          if (rDS.GetMC().GetMCTrack(track_ids.at(itrack)).GetParticleName() == "gamma") {  // check it's a gamma
-            if (verbose) {std::cout << "gamma parent track id: " << rDS.GetMC().GetMCTrack(itrack).GetParentID() << std::endl;}
-            if (rDS.GetMC().GetMCTrack(track_ids.at(itrack)).GetParentID() == posi_track) {  // check its parent was the initial track/particle
-              // Get time of first step in track (approx track creation time, I hope)
-              tempTime = rDS.GetMC().GetMCTrack(track_ids.at(itrack)).GetMCTrackStep(0).GetGlobalTime();
-              if (tempTime > creationTime) {
-                creationTime = tempTime;
-              }
-            }
-          }
-        }
-        delay = creationTime - annihilTime;
-      } 
-
-        /* ~~~~~~~ EV info: events and PMT hits ~~~~~~~ */
-
-      for(size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
-        const RAT::DS::EV& rEV = rDS.GetEV(iEV);
-        const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
-        std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(counter);
-        std::string title = "Hit time residuals using the MC position, and o-Ps delay = " + std::to_string(delay);
-        evt_hists.push_back(new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0));
-        for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-            const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-
-            lightPath.CalcByPosition(eventPosition, pmtInfo.GetPosition(pmtCal.GetID()));
-            double distInInnerAV = lightPath.GetDistInInnerAV();
-            double distInAV = lightPath.GetDistInAV();
-            double distInWater = lightPath.GetDistInWater();
-
-            const double transitTime = groupVelocity.CalcByDistance( distInInnerAV, distInAV, distInWater ); // Assumes a 400nm photon
-            // Time residuals estimate the photon emission time relative to the event start so subtract off the transit time
-            // hit times are relative to the trigger time, which will depend on event time and detector position so correct for that to line up events
-            // The 390ns corrects for the electronics delays and places the pulse in the middle of the window
-            evt_hists.at(counter)->Fill( pmtCal.GetTime() - transitTime - 390 + rDS.GetMCEV(iEV).GetGTTime());
-        }
-        evt_hists.at(counter)->GetYaxis()->SetTitle( "Count per 1 ns bin" );
-        evt_hists.at(counter)->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
-        evt_hists.at(counter)->Draw();
-        ++counter;
-      }
+      evt_hists.at(counter)->GetYaxis()->SetTitle( "Count per 1 ns bin" );
+      evt_hists.at(counter)->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
+      evt_hists.at(counter)->Draw();
+      ++counter;
+    }
   }
   return evt_hists;
 }
