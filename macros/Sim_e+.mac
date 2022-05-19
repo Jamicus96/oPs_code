@@ -5,6 +5,12 @@
 #Set the detector geometry and noise rate database entries used in the simulation
 /rat/db/set DETECTOR geo_file "geo/snoplusnative_te.geo"
 
+#Set o-Ps values (formation fraction, lifetime, and whether decay time is taken from a
+#random distribution based on the lifetime or is hardcoded as the lifetime itself)
+/rat/db/set POSITRONIUM formfrac 1.0
+/rat/db/set POSITRONIUM lifetime 15.0
+/rat/db/set POSITRONIUM random false
+
 #store tracking info except certain particles
 /rat/tracking/store full
 /rat/tracking/omit opticalphoton
