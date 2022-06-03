@@ -144,14 +144,14 @@ void printPDF(const std::string& output_filename, TH1D* hist) {
     datafile << "[";
 
     double bin_width = hist->GetBinCenter(2) - hist->GetBinCenter(1);
-    double tot_integral = 0.0;
+    double tot_hits = 0.0;
     std::vector<double> times;
     std::vector<double> probabilities;
     // Get histogram bin values
     for (unsigned int i = 1; i < hist->GetNbinsX()+1; ++i) { //loop over histogram bins
         times.push_back(hist->GetBinCenter(i));
         probabilities.push_back(hist->GetBinContent(i));
-        tot_integral += bin_width * hist->GetBinContent(i);
+        tot_hits += hist->GetBinContent(i);
 
         // print times to file while as it
         datafile << hist->GetBinCenter(i);
@@ -161,10 +161,12 @@ void printPDF(const std::string& output_filename, TH1D* hist) {
     }
     datafile << "]" << std::endl;
 
+    std::cout << "Total number of PMT hits = " << tot_hits << std::endl;
+
     // Normalise to pdf
     datafile << "[";
     for (unsigned int i = 0; i < probabilities.size(); ++i) {
-        probabilities.at(i) /= tot_integral;
+        probabilities.at(i) /= (tot_hits * bin_width);
         datafile << probabilities.at(i);
         if (i < probabilities.size() - 1) {
             datafile << ", ";
