@@ -58,9 +58,9 @@ int main(int argc, char** argv) {
     // Create output file names
     if (verbose) {std::cout << "Creating output file" << std::endl;}
     std::size_t botDirPos = file.find_last_of("/");
-    std::string filename = file.substr(botDirPos+1, file.length());
-    std::string saveroot = "Hists_" + filename;
-    std::string pdf_filename = "pdf_" + filename;
+    std::string filename = file.substr(botDirPos+1, file.length() - 5);
+    std::string saveroot = "Hists_" + filename + ".root";
+    std::string pdf_filename = "pdf_" + filename + ".txt";
 
     // Get o-Ps pdf and print to file
     printPDF(pdf_filename, MC_summed_hist);
