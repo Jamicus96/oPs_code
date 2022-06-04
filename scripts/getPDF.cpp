@@ -55,14 +55,17 @@ int main(int argc, char** argv) {
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
     TH1D* MC_summed_hist = PlotHitTimeResidualsMCPosition(file, delays, verbose);
 
-    // Get o-Ps pdf and print to file
-    printPDF("oPs_pdf.txt", MC_summed_hist);
-
-    // Create output file
+    // Create output file names
     if (verbose) {std::cout << "Creating output file" << std::endl;}
     std::size_t botDirPos = file.find_last_of("/");
     std::string filename = file.substr(botDirPos+1, file.length());
     std::string saveroot = "Hists_" + filename;
+    std::string pdf_filename = "pdf_" + filename;
+
+    // Get o-Ps pdf and print to file
+    printPDF(pdf_filename, MC_summed_hist);
+
+    // Save root file
     TFile *rootfile = new TFile(saveroot.c_str(),"RECREATE");
 
     // Now write everything to the file and close
