@@ -211,7 +211,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
             const RAT::DS::EV& rEV = rDS.GetEV( iEV );
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             for( size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++ ) {
-                if (delays.at(evt_idx) != 0.0) {  // Filter out non o-Ps events
+                //if (delays.at(evt_idx) != 0.0) {  // Filter out non o-Ps events
                     ++num_evts;
                     const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT( iPMT );
 
@@ -225,7 +225,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
                     // hit times are relative to the trigger time, which will depend on event time and detector position so correct for that to line up events
                     // The 390ns corrects for the electronics delays and places the pulse in the middle of the window
                     histTimeResiduals->Fill( pmtCal.GetTime() - transitTime - 390 + rDS.GetMCEV(iEV).GetGTTime());
-                }
+                //}
             }
         }
     }
