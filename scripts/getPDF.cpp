@@ -227,7 +227,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
 
                     // histTimeResiduals->Fill( pmtCal.GetTime() - transitTime - 390 + rDS.GetMCEV(iEV).GetGTTime());
 
-                    DU::TimeResidualCalculator fTRCalc = DU::Utility::Get()->GetTimeResidualCalculator();
+                    RAT::DU::TimeResidualCalculator fTRCalc = DU::Utility::Get()->GetTimeResidualCalculator();
                     histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, rDS.GetMCEV(iEV).GetGTTime()));
                 //}
             }
