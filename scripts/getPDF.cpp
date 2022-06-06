@@ -42,18 +42,19 @@
 
 std::vector<double> findPositronDelays(const std::string& filename, bool verbose);
 void printPDF(const std::string& output_filename, TH1D* hist);
-TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool verbose);
+TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose);
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
-    bool verbose = argv[2];
+    bool is_oPs = argv[2];
+    bool verbose = argv[3];
 
     // Get e+ delays
     std::vector<double> delays = findPositronDelays(file, verbose);
 
     // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
-    TH1D* MC_summed_hist = PlotHitTimeResidualsMCPosition(file, delays, verbose);
+    TH1D* MC_summed_hist = PlotHitTimeResidualsMCPosition(file, delays, is_oPs, verbose);
 
     // Create output file names
     if (verbose) {std::cout << "Creating output file" << std::endl;}
@@ -183,7 +184,7 @@ void printPDF(const std::string& output_filename, TH1D* hist) {
 ///
 /// @param[in] fileName of the RAT::DS root file to analyse
 /// @return the histogram plot
-TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool verbose) {
+TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose) {
     if (verbose) {std::cout << "Running pdfMCPosition()" << std::endl;}
 
     TH1D* histTimeResiduals = new TH1D( "pdfTimeResidualsMC", "PDF for Hit time residuals using the MC position", 1300, -300.5, 999.5 );
@@ -211,7 +212,9 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
             const RAT::DS::EV& rEV = rDS.GetEV( iEV );
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             for( size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++ ) {
-                //if (delays.at(evt_idx) != 0.0) {  // Filter out non o-Ps events
+                if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
+                    continue;
+                } else {
                     ++num_evts;
                     const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT( iPMT );
 
@@ -229,7 +232,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
 
                     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
                     histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, rDS.GetMCEV(iEV).GetGTTime()));
-                //}
+                }
             }
         }
     }
