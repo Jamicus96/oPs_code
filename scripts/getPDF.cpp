@@ -212,6 +212,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
             const RAT::DS::EV& rEV = rDS.GetEV( iEV );
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+                std::cout << "IN" << std::endl;
                 if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
                     continue;
                     std::cout << "RIP" << std::endl;
