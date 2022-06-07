@@ -40,7 +40,7 @@
 #include <string>
 #include <fstream>
 
-std::vector<double> findPositronDelays(const std::string& filename, bool verbose);
+std::vector<std::vector<double> > findPositronDelays(const std::string& filename, bool verbose);
 void printPDF(const std::string& output_filename, TH1D* hist);
 TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose);
 
@@ -50,7 +50,9 @@ int main(int argc, char** argv) {
     bool verbose = std::stoi(argv[3]);
 
     // Get e+ delays
-    std::vector<double> delays = findPositronDelays(file, verbose);
+    std::vector<std::vector<double> > delays_vecs = findPositronDelays(file, verbose);
+    std::vector<double> delays = delays_vecs.at(0);
+    std::vector<double> delays_sansZero = delays_vecs.at(1);
 
     // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
@@ -87,51 +89,57 @@ int main(int argc, char** argv) {
  * @param filename 
  * @return std::vector<double> 
  */
-std::vector<double> findPositronDelays(const std::string& filename, bool verbose) {
-  if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
+std::vector<std::vector<double> > findPositronDelays(const std::string& filename, bool verbose) {
+    if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
 
-  RAT::DU::DSReader dsReader(filename);
-  std::vector<double> delays;
+    RAT::DU::DSReader dsReader(filename);
+    std::vector<double> delays;
+    std::vector<double> delays_sansZero;
 
-  // Loop through events. Each one should have one primary track (first child) in MC
-  if (verbose) {std::cout << "Looping through events..." << std::endl;}
-  for (size_t iEv =0; iEv<dsReader.GetEntryCount(); iEv++) {
-    const RAT::DS::Entry& rDS = dsReader.GetEntry(iEv);
-    RAT::TrackNav nav(&rDS);
-    RAT::TrackCursor cursor = nav.Cursor(false);
+    // Loop through events. Each one should have one primary track (first child) in MC
+    if (verbose) {std::cout << "Looping through events..." << std::endl;}
+    for (size_t iEv =0; iEv<dsReader.GetEntryCount(); iEv++) {
+        const RAT::DS::Entry& rDS = dsReader.GetEntry(iEv);
+        RAT::TrackNav nav(&rDS);
+        RAT::TrackCursor cursor = nav.Cursor(false);
 
-    // Check there is an event in this entry (won't get associated t_res plot if not)
-    if (rDS.GetEVCount() > 0) {
-      // Should only go through this loop once in MC.
-      for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
-        cursor.GoChild(iCh);
+        // Check there is an event in this entry (won't get associated t_res plot if not)
+        if (rDS.GetEVCount() > 0) {
+        // Should only go through this loop once in MC.
+        for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
+            cursor.GoChild(iCh);
 
-        // Go to the end of the e+ track
-        cursor.GoTrackEnd();
-        RAT::TrackNode* parent_node = cursor.Here();
-        double start_time = parent_node->GetGlobalTime();
-        if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
-        if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
+            // Go to the end of the e+ track
+            cursor.GoTrackEnd();
+            RAT::TrackNode* parent_node = cursor.Here();
+            double start_time = parent_node->GetGlobalTime();
+            if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
+            if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
 
-        // Go to the start of the first child track (gamma)
-        cursor.GoChild(0);
-        RAT::TrackNode* child_node = cursor.Here();
-        double end_time = child_node->GetGlobalTime();
-        delays.push_back(end_time - start_time);
-        if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
-        if (verbose) {std::cout << "e+ delay: " << end_time - start_time << std::endl;}
+            // Go to the start of the first child track (gamma)
+            cursor.GoChild(0);
+            RAT::TrackNode* child_node = cursor.Here();
+            double end_time = child_node->GetGlobalTime();
+            delays.push_back(end_time - start_time);
+            if (end_time - start_time) {
+                delays_sansZero.push_back(end_time - start_time);
+            }
+            if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
+            if (verbose) {std::cout << "e+ delay: " << end_time - start_time << std::endl;}
 
-        // Go back to e+ track
-        cursor.GoParent();
+            // Go back to e+ track
+            cursor.GoParent();
 
-        // Go back to parent node to redo loop
-        cursor.GoTrackStart();
-        cursor.GoParent();
-      } //Primary Particle Tracks
-    }
-  } //event
+            // Go back to parent node to redo loop
+            cursor.GoTrackStart();
+            cursor.GoParent();
+        } //Primary Particle Tracks
+        }
+    } //event
 
-  return delays;
+    if (verbose) {std::cout << "Num delays: " << delays << std::endl;}
+    std::vector<std::vector<double> > results = {delays, delays_sansZero};
+    return results;
 }
 
 /**
@@ -212,6 +220,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
             const RAT::DS::EV& rEV = rDS.GetEV( iEV );
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+                if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
                 if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
                     if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
                     ++evt_idx;
@@ -222,6 +231,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
                     const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
                     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
                     histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));  // event time is 390ns - GT time.
+                    if (verbose) {std::cout << "...added." << std::endl;}
                     ++num_evts;
                     ++evt_idx;
                 }
