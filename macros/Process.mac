@@ -27,7 +27,7 @@
 /rat/procset update 10
 
 /rat/proc outroot
-/rat/procset file "output.root"
+/rat/procset file "Proc_oPs_output.root"
 # END EVENT LOOP
 
 /rat/inroot/read
