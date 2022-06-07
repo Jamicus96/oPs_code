@@ -44,8 +44,7 @@ void printResults(const std::string& output_filename, std::vector<double> delays
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
-    bool is_oPs = std::stoi(argv[2]);
-    bool verbose = std::stoi(argv[3]);
+    bool verbose = std::stoi(argv[2]);
 
     // Get e+ delays
     std::vector<std::vector<double> > results = findPositronDelays_andClassification(file, verbose);
@@ -87,7 +86,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
         // Check there is an event in this entry (won't get associated t_res plot if not)
         if (rDS.GetEVCount() > 0) {
-            const RAT::DS::EV& rEv = rDS.GetEV(iEv);
+            const RAT::DS::EV& rEv = rDS.GetEV(0);
             RAT::DS::ClassifierResult cResult = rEv.GetClassifierResult("PositroniumClassifier");     // Get classifier result
             classier_results.push_back(cResult.GetClassification("PositroniumClassifier"));
             // Should only go through this loop once in MC.
