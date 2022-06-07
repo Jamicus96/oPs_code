@@ -137,7 +137,7 @@ std::vector<std::vector<double> > findPositronDelays(const std::string& filename
         }
     } //event
 
-    if (verbose) {std::cout << "Num delays: " << delays << std::endl;}
+    if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
     std::vector<std::vector<double> > results = {delays, delays_sansZero};
     return results;
 }
