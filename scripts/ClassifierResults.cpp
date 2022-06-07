@@ -40,7 +40,7 @@
 #include <fstream>
 
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& filename, bool verbose);
-void printResults(const std::string& output_filename, TH1D* hist);
+void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results);
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
@@ -87,8 +87,8 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
         // Check there is an event in this entry (won't get associated t_res plot if not)
         if (rDS.GetEVCount() > 0) {
-            const RAT::DS::EV& rEV = rDS.GetEV(iEV);
-            RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");     // Get classifier result
+            const RAT::DS::EV& rEv = rDS.GetEV(iEv);
+            RAT::DS::ClassifierResult cResult = rEv.GetClassifierResult("PositroniumClassifier");     // Get classifier result
             classier_results.push_back(cResult.GetClassification("PositroniumClassifier"));
             // Should only go through this loop once in MC.
             for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
@@ -141,7 +141,7 @@ void printResults(const std::string& output_filename, std::vector<double> delays
     datafile << "[";
     for (unsigned int i = 0; i < delays.size(); ++i) {
         datafile << delays.at(i);
-        if (i < hist->GetNbinsX()) {
+        if (i < delays.size() - 1) {
             datafile << ", ";
         }
     }
@@ -151,7 +151,7 @@ void printResults(const std::string& output_filename, std::vector<double> delays
     datafile << "[";
     for (unsigned int i = 0; i < classier_results.size(); ++i) {
         datafile << classier_results.at(i);
-        if (i < hist->GetNbinsX()) {
+        if (i < classier_results.size() - 1) {
             datafile << ", ";
         }
     }
