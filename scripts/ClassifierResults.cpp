@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     if (verbose) {std::cout << "Creating output file" << std::endl;}
     std::size_t botDirPos = file.find_last_of("/");
     std::string filename = file.substr(botDirPos+1, file.length() - 5);
-    std::string classiderRes_filename = "pdf_" + filename + ".txt";
+    std::string classiderRes_filename = "ClassifierRes_" + filename + ".txt";
 
     // Get o-Ps pdf and print to file
     if (verbose) {std::cout << "Printing results to file..." << std::endl;}
