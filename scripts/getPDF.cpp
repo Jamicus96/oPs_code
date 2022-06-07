@@ -216,7 +216,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
                     continue;
                 } else {
                     ++num_evts;
-                    const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT( iPMT );
+                    const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
 
                     // lightPath.CalcByPosition( eventPosition, pmtInfo.GetPosition( pmtCal.GetID() ) );
                     // double distInInnerAV = lightPath.GetDistInInnerAV();
@@ -231,7 +231,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
                     // histTimeResiduals->Fill( pmtCal.GetTime() - transitTime - 390 + rDS.GetMCEV(iEV).GetGTTime());
 
                     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
-                    histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, rDS.GetMCEV(iEV).GetGTTime()));
+                    histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));
                 }
             }
         }
