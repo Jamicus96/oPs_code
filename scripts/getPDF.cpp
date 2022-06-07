@@ -213,13 +213,15 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
                 if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
+                    if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
                     continue;
                 } else {
-                    ++num_evts;
+                    if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
                     // Use new time residual calculator
                     const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
                     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
                     histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));  // event time is 390ns - GT time.
+                    ++num_evts;
                 }
                 ++evt_idx;
             }
