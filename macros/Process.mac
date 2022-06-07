@@ -8,7 +8,7 @@
 # This macro demonstrates how to load a root file called input.root and run
 # processors on it including output to a root file called output.root.
 
-/rat/inroot/load oPs_output.root
+/rat/inroot/load /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/oPs_output.root
 
 # Extra files can also be loaded by including extra lines, such as:
 #/rat/inroot/load input2.root
