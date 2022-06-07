@@ -185,7 +185,7 @@ void printPDF(const std::string& output_filename, TH1D* hist) {
 /// @param[in] fileName of the RAT::DS root file to analyse
 /// @return the histogram plot
 TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose) {
-    if (verbose) {std::cout << "Running pdfMCPosition()" << std::endl;}
+    if (verbose) {std::cout << "Running PlotHitTimeResidualsMCPosition()" << std::endl;}
 
     TH1D* histTimeResiduals = new TH1D( "pdfTimeResidualsMC", "PDF for Hit time residuals using the MC position", 1300, -300.5, 999.5 );
     // If this is being done on data that does not require remote database connection
@@ -195,7 +195,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
     // NOTE: Don't do this if you are using real data!!!
     RAT::DB::Get()->SetAirplaneModeStatus(true);
 
-    RAT::DU::DSReader dsReader( fileName );
+    RAT::DU::DSReader dsReader(fileName);
 
     // RAT::DU::Utility::Get()->GetLightPathCalculator() must be called *after* the RAT::DU::DSReader constructor.
     RAT::DU::LightPathCalculator lightPath = RAT::DU::Utility::Get()->GetLightPathCalculator(); // To calculate the light's path
@@ -234,6 +234,7 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
                     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
                     histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));  // event time is 390ns - GT time.
                 }
+                ++evt_idx;
             }
         }
     }
