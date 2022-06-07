@@ -212,27 +212,12 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
             const RAT::DS::EV& rEV = rDS.GetEV( iEV );
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-                std::cout << "IN" << std::endl;
                 if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
-                    std::cout << "RIP" << std::endl;
                     continue;
                 } else {
                     ++num_evts;
-                    std::cout << "YASS" << std::endl;
+                    // Use new time residual calculator
                     const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-
-                    // lightPath.CalcByPosition( eventPosition, pmtInfo.GetPosition( pmtCal.GetID() ) );
-                    // double distInInnerAV = lightPath.GetDistInInnerAV();
-                    // double distInAV = lightPath.GetDistInAV();
-                    // double distInWater = lightPath.GetDistInWater();
-
-                    // const double transitTime = groupVelocity.CalcByDistance( distInInnerAV, distInAV, distInWater ); // Assumes a 400nm photon
-                    // // Time residuals estimate the photon emission time relative to the event start so subtract off the transit time
-                    // // hit times are relative to the trigger time, which will depend on event time and detector position so correct for that to line up events
-                    // // The 390ns corrects for the electronics delays and places the pulse in the middle of the window
-
-                    // histTimeResiduals->Fill( pmtCal.GetTime() - transitTime - 390 + rDS.GetMCEV(iEV).GetGTTime());
-
                     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
                     histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));  // event time is 390ns - GT time.
                 }
