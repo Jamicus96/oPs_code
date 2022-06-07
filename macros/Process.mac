@@ -24,7 +24,6 @@
 # Run new Positronium classifier (results can be accessed when analysing output root file)
 /rat/proc classifier
 /rat/procset classifier "PositroniumClassifier"
-/rat/procset update 10
 
 /rat/proc outroot
 /rat/procset file "Proc_oPs_output.root"
