@@ -214,13 +214,17 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
     unsigned int evt_idx = 0;
     unsigned int num_evts = 0;
     for(size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); iEntry++) {
-        const RAT::DS::Entry& rDS = dsReader.GetEntry( iEntry );
+        const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
         const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
         for(size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
-            const RAT::DS::EV& rEV = rDS.GetEV( iEV );
+            const RAT::DS::EV& rEV = rDS.GetEV(iEV);
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
-            if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
+            if (evt_idx >= delays.size()) {
+                if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
+                ++evt_idx;
+                continue;
+            } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
                 if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
                 ++evt_idx;
                 continue;
