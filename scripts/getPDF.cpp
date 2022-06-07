@@ -46,8 +46,8 @@ TH1D* PlotHitTimeResidualsMCPosition(const std::string& fileName, std::vector<do
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
-    bool is_oPs = argv[2];
-    bool verbose = argv[3];
+    bool is_oPs = std::stoi(argv[2]);
+    bool verbose = std::stoi(argv[3]);
 
     // Get e+ delays
     std::vector<double> delays = findPositronDelays(file, verbose);
