@@ -145,22 +145,23 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                                 + " ns, and Classifier result = " + std::to_string(classier_result);
             TH1D* evt_hist = new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0);
 
-            std::cout << "1" << std::endl;
+            //std::cout << "1" << std::endl;
 
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
-            std::cout << "2" << std::endl;
+            //std::cout << "2" << std::endl;
             const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
-            std::cout << "3" << std::endl;
+            double event_time = 390 - rEV.GetGTTime();  // event time is 390ns - GT time.
+            //std::cout << "3" << std::endl;
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-                std::cout << "4" << std::endl;
+                //std::cout << "4" << std::endl;
                 const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-                std::cout << "5" << std::endl;
+                //std::cout << "5" << std::endl;
                 RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
-                std::cout << "6" << std::endl;
-                evt_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEv).GetGTTime()));  // event time is 390ns - GT time.
-                std::cout << "7" << std::endl;
-                summed_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEv).GetGTTime()));
-                std::cout << "8" << std::endl;
+                //std::cout << "6" << std::endl;
+                evt_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, event_time));
+                //std::cout << "7" << std::endl;
+                summed_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, event_time));
+                //std::cout << "8" << std::endl;
             }
             // Write event residual hit time to root file
             evt_hist->Write();
