@@ -153,7 +153,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     } //event
 
     // Write summed histogram to root file
-    std::string summed_title = "Hit time residuals using the MC position, summed over " + std::to_string(iEV)
+    std::string summed_title = "Hit time residuals using the MC position, summed over " + std::to_string(iEv)
                                 + " events, and mean o-Ps delay = " + std::to_string(mean_delay) + " ns";
     summed_hist->SetTitle(summed_title.c_str());
     summed_hist->Write();
