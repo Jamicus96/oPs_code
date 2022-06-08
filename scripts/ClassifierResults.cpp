@@ -75,7 +75,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
 
     RAT::DB::Get()->SetAirplaneModeStatus(true);
-    RAT::DU::DSReader dsReader(filename);
+    RAT::DU::DSReader dsReader(input_filename);
     std::vector<double> delays;
     double delay = 0.0;
     std::vector<double> classier_results;
@@ -144,8 +144,8 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
                 const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
                 RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
-                evt_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));  // event time is 390ns - GT time.
-                summed_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));
+                evt_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEv).GetGTTime()));  // event time is 390ns - GT time.
+                summed_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEv).GetGTTime()));
             }
             // Write event residual hit time to root file
             evt_hist->Write();
@@ -155,7 +155,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     // Write summed histogram to root file
     std::string summed_title = "Hit time residuals using the MC position, summed over " + std::to_string(iEV)
                                 + " events, and mean o-Ps delay = " + std::to_string(mean_delay) + " ns";
-    MC_summed_hist->SetTitle(summed_title.c_str());
+    summed_hist->SetTitle(summed_title.c_str());
     summed_hist->Write();
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
