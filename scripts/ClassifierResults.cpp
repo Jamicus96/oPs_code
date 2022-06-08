@@ -147,10 +147,10 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
             //std::cout << "1" << std::endl;
 
-            const RAT::DS::CalPMTs& calibratedPMTs = rDS.GetMCEV(0).GetCalPMTs();
+            const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             //std::cout << "2" << std::endl;
             const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
-            double event_time = 390 - rEV.GetGTTime();  // event time is 390ns - GT time.
+            double event_time = 390 - rDS.GetMCEV().GetGTTime();  // event time is 390ns - GT time.
             //std::cout << "3" << std::endl;
             for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
                 //std::cout << "4" << std::endl;
