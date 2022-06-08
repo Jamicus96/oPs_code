@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+
 /**
  * @brief Returns a list of the delays imparted to positron decays (emulating oPs)
  * 
@@ -102,6 +103,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");     // Get classifier result
             classier_results.push_back(cResult.GetClassification("PositroniumClassifier"));
             // Should only go through this loop once in MC.
+            if (verbose) {std::cout << "Getting track history..." << std::endl;}
             for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
                 cursor.GoChild(iCh);
 
@@ -130,6 +132,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             delays.push_back(delay);
 
             /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
+            if (verbose) {std::cout << "Making histograms..." << std::endl;}
 
             // update mean delay
             mean_delay += (delay - mean_delay) / (iEv + 1);
@@ -150,6 +153,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             }
             // Write event residual hit time to root file
             evt_hist->Write();
+            if (verbose) {std::cout << "End of loop." << std::endl;}
         }
         ++num_evts;
     } //event
@@ -165,6 +169,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     std::vector<std::vector<double> > results = {delays, classier_results};
     return results;
 }
+
 
 /**
  * @brief Print pdf to text file based on inputted histogram.
