@@ -79,6 +79,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     RAT::DU::DSReader dsReader(input_filename);
     std::vector<double> delays;
     double delay = 0.0;
+    double classier_result = 0.0;
     std::vector<double> classier_results;
 
     // output root file
@@ -101,7 +102,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
         if (rDS.GetEVCount() > 0) {
             const RAT::DS::EV& rEV = rDS.GetEV(0);
             RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");     // Get classifier result
-            classier_results.push_back(cResult.GetClassification("PositroniumClassifier"));
+            classier_result = cResult.GetClassification("PositroniumClassifier");
             // Should only go through this loop once in MC.
             if (verbose) {std::cout << "Getting track history..." << std::endl;}
             for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
@@ -130,6 +131,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 cursor.GoParent();
             } //Primary Particle Tracks
             delays.push_back(delay);
+            classier_results.push_back(classier_result);
 
             /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
             if (verbose) {std::cout << "Making histograms..." << std::endl;}
@@ -140,7 +142,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             // for each individual event
             std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(iEv);
             std::string title = "Hit time residuals using the MC position, with o-Ps delay = " + std::to_string(delay)
-                                + " ns, and Classifier result = " + std::to_string(classier_results.at(iEv));
+                                + " ns, and Classifier result = " + std::to_string(classier_result);
             TH1D* evt_hist = new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0);
 
             const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
