@@ -107,6 +107,8 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             const RAT::DS::EV& rEV = rDS.GetEV(0);
             RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");     // Get classifier result
             classier_result = cResult.GetClassification("PositroniumClassifier");
+            if (verbose) {std::cout << "Classifier result (for next particle) = " << classier_result << std::endl;}
+
             // Should only go through this loop once in MC.
             if (verbose) {std::cout << "Getting track history..." << std::endl;}
             for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
@@ -137,17 +139,18 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
             // Make sure that if it's only o-Ps sims to leave out the few bugged events with no delay
             if (!is_oPs || delay != 0.0) {
+                if (verbose) {std::cout << "Writing info..." << std::endl;}
                 delays.push_back(delay);
                 classier_results.push_back(classier_result);
 
                 /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
                 if (make_hists) {
-                    if (verbose) {std::cout << "Making histograms..." << std::endl;}
+                    if (verbose) {std::cout << "Making histograms... (hist #" << num_evts << ")" << std::endl;}
                     // update mean delay
                     mean_delay += (delay - mean_delay) / (num_evts + 1);
 
                     // for each individual event
-                    std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(iEv);
+                    std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(num_evts);
                     std::string title = "Hit time residuals using the MC position, with o-Ps delay = " + std::to_string(delay)
                                         + " ns, and Classifier result = " + std::to_string(classier_result);
                     TH1D* evt_hist = new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0);
