@@ -136,7 +136,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             } //Primary Particle Tracks
 
             // Make sure that if it's only o-Ps sims to leave out the few bugged events with no delay
-            if (!is_oPs || delays.at(evt_idx) != 0.0) {
+            if (!is_oPs || delay != 0.0) {
                 delays.push_back(delay);
                 classier_results.push_back(classier_result);
 
