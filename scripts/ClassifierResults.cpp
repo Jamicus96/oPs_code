@@ -111,8 +111,9 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
             // Should only go through this loop once in MC.
             if (verbose) {std::cout << "Getting track history..." << std::endl;}
-            for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
-                cursor.GoChild(iCh);
+            //for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
+                //cursor.GoChild(iCh);
+                cursor.GoChild(0);
 
                 // Go to the end of the e+ track
                 cursor.GoTrackEnd();
@@ -135,7 +136,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 // Go back to parent node to redo loop
                 cursor.GoTrackStart();
                 cursor.GoParent();
-            } //Primary Particle Tracks
+            //} //Primary Particle Tracks
 
             // Make sure that if it's only o-Ps sims to leave out the few bugged events with no delay
             if (!is_oPs || delay != 0.0) {
