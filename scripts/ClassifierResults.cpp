@@ -39,12 +39,14 @@
 #include <string>
 #include <fstream>
 
-std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool verbose);
+std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool is_oPs, bool make_hists, bool verbose);
 void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results);
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
-    bool verbose = std::stoi(argv[2]);
+    bool is_oPs = std::stoi(argv[2]);
+    bool make_hists = std::stoi(argv[3]);
+    bool verbose = std::stoi(argv[4]);
 
     // Create output file names
     if (verbose) {std::cout << "Creating output file" << std::endl;}
@@ -54,7 +56,7 @@ int main(int argc, char** argv) {
     std::string hist_filename = "Hists_" + filename + ".root";
 
     // Get e+ delays
-    std::vector<std::vector<double> > results = findPositronDelays_andClassification(file, hist_filename, verbose);
+    std::vector<std::vector<double> > results = findPositronDelays_andClassification(file, hist_filename, is_oPs, make_hists, verbose);
     std::vector<double> delays = results.at(0);
     std::vector<double> classier_results = results.at(1);
 
@@ -72,7 +74,7 @@ int main(int argc, char** argv) {
  * @param filename 
  * @return std::vector<double> 
  */
-std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool verbose) {
+std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool is_oPs, bool make_hists, bool verbose) {
     if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
 
     RAT::DB::Get()->SetAirplaneModeStatus(true);
@@ -82,9 +84,11 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     double classier_result = 0.0;
     std::vector<double> classier_results;
 
-    // output root file
-    TFile *rootfile = new TFile(hist_filename.c_str(), "RECREATE");
-    rootfile->cd();
+    if (make_hists) {
+        // output root file
+        TFile *rootfile = new TFile(hist_filename.c_str(), "RECREATE");
+        rootfile->cd();
+    }
 
     // sumed over all events
     TH1D* summed_hist = new TH1D("SummedTimeResidualsMC", "Summed hit time residuals using the MC position, and everage o-Ps delay = ? ns", 1000, -10.0, 500.0);
@@ -130,51 +134,58 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 cursor.GoTrackStart();
                 cursor.GoParent();
             } //Primary Particle Tracks
-            delays.push_back(delay);
-            classier_results.push_back(classier_result);
 
-            /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
-            if (verbose) {std::cout << "Making histograms..." << std::endl;}
+            // Make sure that if it's only o-Ps sims to leave out the few bugged events with no delay
+            if (!is_oPs || delays.at(evt_idx) != 0.0) {
+                delays.push_back(delay);
+                classier_results.push_back(classier_result);
 
-            // update mean delay
-            mean_delay += (delay - mean_delay) / (num_evts + 1);
+                /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
+                if (make_hists) {
+                    if (verbose) {std::cout << "Making histograms..." << std::endl;}
+                    // update mean delay
+                    mean_delay += (delay - mean_delay) / (num_evts + 1);
 
-            // for each individual event
-            std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(iEv);
-            std::string title = "Hit time residuals using the MC position, with o-Ps delay = " + std::to_string(delay)
-                                + " ns, and Classifier result = " + std::to_string(classier_result);
-            TH1D* evt_hist = new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0);
+                    // for each individual event
+                    std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(iEv);
+                    std::string title = "Hit time residuals using the MC position, with o-Ps delay = " + std::to_string(delay)
+                                        + " ns, and Classifier result = " + std::to_string(classier_result);
+                    TH1D* evt_hist = new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0);
 
-            //std::cout << "1" << std::endl;
+                    //std::cout << "1" << std::endl;
 
-            const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
-            //std::cout << "2" << std::endl;
-            const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
-            double event_time = 390 - rDS.GetMCEV(0).GetGTTime();  // event time is 390ns - GT time.
-            //std::cout << "3" << std::endl;
-            for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-                //std::cout << "4" << std::endl;
-                const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-                //std::cout << "5" << std::endl;
-                RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
-                //std::cout << "6" << std::endl;
-                evt_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, event_time));
-                //std::cout << "7" << std::endl;
-                summed_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, event_time));
-                //std::cout << "8" << std::endl;
+                    const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
+                    //std::cout << "2" << std::endl;
+                    const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
+                    double event_time = 390 - rDS.GetMCEV(0).GetGTTime();  // event time is 390ns - GT time.
+                    //std::cout << "3" << std::endl;
+                    for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+                        //std::cout << "4" << std::endl;
+                        const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
+                        //std::cout << "5" << std::endl;
+                        RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
+                        //std::cout << "6" << std::endl;
+                        evt_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, event_time));
+                        //std::cout << "7" << std::endl;
+                        summed_hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, event_time));
+                        //std::cout << "8" << std::endl;
+                    }
+                    // Write event residual hit time to root file
+                    evt_hist->Write();
+                }
+                if (verbose) {std::cout << "End of loop." << std::endl;}
+                ++num_evts;
             }
-            // Write event residual hit time to root file
-            evt_hist->Write();
-            if (verbose) {std::cout << "End of loop." << std::endl;}
-            ++num_evts;
         }
     } //event
 
-    // Write summed histogram to root file
-    std::string summed_title = "Hit time residuals using the MC position, summed over " + std::to_string(num_evts)
-                                + " events, and mean o-Ps delay = " + std::to_string(mean_delay) + " ns";
-    summed_hist->SetTitle(summed_title.c_str());
-    summed_hist->Write();
+    if (make_hists) {
+        // Write summed histogram to root file
+        std::string summed_title = "Hit time residuals using the MC position, summed over " + std::to_string(num_evts)
+                                    + " events, and mean o-Ps delay = " + std::to_string(mean_delay) + " ns";
+        summed_hist->SetTitle(summed_title.c_str());
+        summed_hist->Write();
+    }
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
     if (verbose) {std::cout << "Num classifier results: " << classier_results.size() << std::endl;}
