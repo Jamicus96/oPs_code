@@ -21,9 +21,13 @@
 
 # BEGIN EVENT LOOP
 
+# Run fitter
+/rat/proc scintFitter
+
 # Run new Positronium classifier (results can be accessed when analysing output root file)
 /rat/proc classifier
 /rat/procset classifier "PositroniumClassifier"
+/rat/procset seed "scintFitter"
 
 /rat/proc outroot
 /rat/procset file "Proc_oPs_output.root"
