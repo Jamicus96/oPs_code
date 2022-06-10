@@ -16,6 +16,13 @@
 /rat/tracking/omit opticalphoton
 /rat/tracking/omit e-
 
+# Begin Event loop and the processors to be run on each event
+/run/initialize
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
 # Run fitter
 /rat/proc scintFitter
 
@@ -24,12 +31,6 @@
 /rat/procset classifier "PositroniumClassifier"
 /rat/procset seed "scintFitter"
 
-# Begin Event loop and the processors to be run on each event
-/run/initialize
-/rat/proc frontend
-/rat/proc trigger
-/rat/proc eventbuilder
-/rat/proc calibratePMT
 /rat/proc count
 /rat/procset update 10
 /rat/proc outroot
@@ -41,6 +42,6 @@
 /generator/pos/set 0.0 0.0 0.0
 /generator/rate/set 1
 
-# start the simulation with 1000 events
-/rat/run/start 1000
+# start the simulation with 100 events
+/rat/run/start 100
 exit
