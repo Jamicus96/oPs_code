@@ -23,6 +23,9 @@
 /rat/proc eventbuilder
 /rat/proc calibratePMT
 
+/rat/proc count
+/rat/procset update 10
+
 # Run fitter
 /rat/proc scintFitter
 
@@ -30,9 +33,8 @@
 /rat/proc classifier
 /rat/procset classifier "PositroniumClassifier"
 /rat/procset seed "scintFitter"
+/rat/procset name "PositroniumClassifier"
 
-/rat/proc count
-/rat/procset update 10
 /rat/proc outroot
 /rat/procset file "oPs_output.root"
 
