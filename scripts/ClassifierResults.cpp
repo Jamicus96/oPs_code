@@ -40,7 +40,7 @@
 #include <fstream>
 
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool is_oPs, bool make_hists, bool verbose);
-void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results);
+void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results, std::vector<double> nhits_vec);
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
@@ -59,10 +59,11 @@ int main(int argc, char** argv) {
     std::vector<std::vector<double> > results = findPositronDelays_andClassification(file, hist_filename, is_oPs, make_hists, verbose);
     std::vector<double> delays = results.at(0);
     std::vector<double> classier_results = results.at(1);
+    std::vector<double> nhits_vec = results.at(2);
 
     // Get o-Ps pdf and print to file
     if (verbose) {std::cout << "Printing results to file..." << std::endl;}
-    printResults(classiderRes_filename, delays, classier_results);
+    printResults(classiderRes_filename, delays, classier_results, nhits_vec);
 
     return 0;
 }
@@ -79,10 +80,12 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
     RAT::DB::Get()->SetAirplaneModeStatus(true);
     RAT::DU::DSReader dsReader(input_filename);
-    std::vector<double> delays;
     double delay = 0.0;
+    std::vector<double> delays;
     double classier_result = 0.0;
     std::vector<double> classier_results;
+    double nhits = 0.0;
+    std::vector<double> nhits_vec;
 
     if (make_hists) {
         // output root file
@@ -97,7 +100,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     // Loop through events. Each one should have one primary track (first child) in MC
     if (verbose) {std::cout << "Looping through events..." << std::endl;}
     unsigned int num_evts = 0;
-    for (size_t iEv =0; iEv<dsReader.GetEntryCount(); iEv++) {
+    for (size_t iEv = 0; iEv < dsReader.GetEntryCount(); iEv++) {
         const RAT::DS::Entry& rDS = dsReader.GetEntry(iEv);
         RAT::TrackNav nav(&rDS);
         RAT::TrackCursor cursor = nav.Cursor(false);
@@ -107,6 +110,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             const RAT::DS::EV& rEV = rDS.GetEV(0);
             RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");     // Get classifier result
             classier_result = cResult.GetClassification("PositroniumClassifier");
+            nhits = rEV.GetNhitsCleaned();
             if (verbose) {std::cout << "Classifier result (for next particle) = " << classier_result << std::endl;}
 
             // Should only go through this loop once in MC.
@@ -143,6 +147,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 if (verbose) {std::cout << "Writing info..." << std::endl;}
                 delays.push_back(delay);
                 classier_results.push_back(classier_result);
+                nhits_vec.push_back(nhits);
 
                 /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
                 if (make_hists) {
@@ -193,7 +198,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
     if (verbose) {std::cout << "Num classifier results: " << classier_results.size() << std::endl;}
-    std::vector<std::vector<double> > results = {delays, classier_results};
+    std::vector<std::vector<double> > results = {delays, classier_results, nhits_vec};
     return results;
 }
 
@@ -204,7 +209,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
  * @param output_filename 
  * @param hist 
  */
-void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results) {
+void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results, std::vector<double> nhits_vec) {
 
     // Open file to print results to
     std::ofstream datafile;
@@ -225,6 +230,16 @@ void printResults(const std::string& output_filename, std::vector<double> delays
     for (unsigned int i = 0; i < classier_results.size(); ++i) {
         datafile << classier_results.at(i);
         if (i < classier_results.size() - 1) {
+            datafile << ", ";
+        }
+    }
+    datafile << "]" << std::endl;
+
+    // print nhits
+    datafile << "[";
+    for (unsigned int i = 0; i < nhits_vec.size(); ++i) {
+        datafile << nhits_vec.at(i);
+        if (i < nhits_vec.size() - 1) {
             datafile << ", ";
         }
     }
