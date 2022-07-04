@@ -109,7 +109,36 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
         // Check there is an event in this entry (won't get associated t_res plot if not)
         if (rDS.GetEVCount() > 0) {
             const RAT::DS::EV& rEV = rDS.GetEV(0);
-            RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");     // Get classifier result
+
+            double posRad = 0.0;
+            try{
+                const RAT::DS::FitVertex& rVertex = rEV.GetFitResult(rEV.GetDefaultFitName()).GetVertex(0);
+                if(!(rVertex.ValidPosition() && rVertex.ValidTime()))
+                    continue; // fit invalid
+                posRad = rVertex.GetPosition().Mag();
+            }
+            catch(const RAT::DS::FitCollection::NoResultError&){
+                // no fit result by the name of fitName
+                continue;
+            }
+            catch (const RAT::DS::FitResult::NoVertexError&){
+                // no fit vertex
+                continue;
+            }
+            catch(const RAT::DS::FitVertex::NoValueError&){
+                // position or time missing
+                continue;
+            }
+            // DataNotFound --> implies no fit results are present, don't catch.
+
+            // Apply volume cut
+            if (posRad > vol_cut) {
+                if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
+                continue;
+            }
+
+            // Get classifier result
+            RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");
             classier_result = cResult.GetClassification("PositroniumClassifier");
             nhits = rEV.GetNhitsCleaned();
             if (verbose) {std::cout << "Classifier result (for next particle) = " << classier_result << std::endl;}
