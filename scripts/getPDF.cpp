@@ -42,8 +42,8 @@
 
 std::vector<std::vector<double> > findPositronDelays(const std::string& filename, bool verbose);
 void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hist);
-TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose);
-TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose, std::string fitName = "");
+TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose);
+TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose, std::string fitName = "");
 
 int main(int argc, char** argv) {
     std::string file = argv[1];
@@ -57,8 +57,8 @@ int main(int argc, char** argv) {
 
     // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
-    TH1D* MC_summed_hist = HitTimeResidualsMCPosition(file, delays, is_oPs, verbose);
-    TH1D* Fitted_summed_hist = HitTimeResidualsFitPosition(file, delays, is_oPs, verbose);
+    TH1D* MC_summed_hist = HitTimeResidualsMCPosition(file, delays, 5700, is_oPs, verbose);
+    TH1D* Fitted_summed_hist = HitTimeResidualsFitPosition(file, delays, 5700, is_oPs, verbose);
 
     // Create output file names
     if (verbose) {std::cout << "Creating output file" << std::endl;}
@@ -219,11 +219,16 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
     datafile.close();
 }
 
-/// Plot the hit time residuals for the MC position
-///
-/// @param[in] fileName of the RAT::DS root file to analyse
-/// @return the histogram plot
-TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose) {
+/**
+ * @brief Make hit time residual histogram using MC position and event time (summed over all events).
+ * 
+ * @param fileName Simulation root file .
+ * @param delays Vector of o-Ps decay times.
+ * @param vol_cut Volume cut, given by radius in mm.
+ * @param is_oPs Are events we wish to look at only o-Ps events? If so, ignore delay=0 events (some get simulated anyway for some reason, so cut them out here).
+ * @param verbose
+ */
+TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose) {
     if (verbose) {std::cout << "Running HitTimeResidualsMCPosition()" << std::endl;}
 
     TH1D* histTimeResiduals = new TH1D("pdfTimeResidualsMC", "PDF for Hit time residuals using the MC position", 1300, -300.5, 999.5);
@@ -255,6 +260,10 @@ TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double
                 if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
                 ++evt_idx;
                 continue;
+            } else if (eventPosition.Mag() > vol_cut) {
+                if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
+                ++evt_idx;
+                continue;
             } else {
                 if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
                 // Use new time residual calculator
@@ -277,11 +286,17 @@ TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double
 }
 
 
-/// Plot the hit time residuals for the fit position
-///
-/// @param[in] fileName of the RAT::DS root file to analyse
-/// @return the histogram plot
-TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<double> delays, bool is_oPs, bool verbose, std::string fitName) {
+/**
+ * @brief Make hit time residual histogram using Fit position and event time (summed over all events).
+ * 
+ * @param fileName Simulation root file .
+ * @param delays Vector of o-Ps decay times.
+ * @param vol_cut Volume cut, given by radius in mm.
+ * @param is_oPs Are events we wish to look at only o-Ps events? If so, ignore delay=0 events (some get simulated anyway for some reason, so cut them out here).
+ * @param verbose
+ * @param fitName Which fitter to use if not default.
+ */
+TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose, std::string fitName) {
     if (verbose) {std::cout << "Running HitTimeResidualsFitPosition()" << std::endl;}
 
     TH1D* hHitTimeResiduals = new TH1D("hHitTimeResidualsFit", "Hit time residuals using the Fit position", 1300, -300.5, 999.5);
@@ -341,6 +356,10 @@ TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<doub
                 continue;
             } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
                 if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
+                ++evt_idx;
+                continue;
+            } else if (eventPosition.Mag() > vol_cut) {
+                if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
                 ++evt_idx;
                 continue;
             } else {
