@@ -163,11 +163,11 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
 
     // Checks
     if (bin_width != Fitted_hist->GetBinCenter(2) - Fitted_hist->GetBinCenter(1)) {
-        std::cout << "Bin widths different" << std::cout;
+        std::cout << "Bin widths different" << std::endl;
         exit(1);
     }
     if (N_bins != Fitted_hist->GetNbinsX()) {
-        std::cout << "Number of bins different" << std::cout;
+        std::cout << "Number of bins different" << std::endl;
         exit(1);
     }
 
@@ -192,7 +192,8 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
     }
     datafile << "]" << std::endl;
 
-    std::cout << "Total number of PMT hits = " << tot_hits << std::endl;
+    std::cout << "Total number of MC PMT hits = " << tot_MC_hits << std::endl;
+    std::cout << "Total number of Fitted PMT hits = " << tot_Fitted_hits << std::endl;
 
     // Normalise MC to pdf
     datafile << "[";
@@ -250,7 +251,7 @@ TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double
         const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
         for(size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
             const RAT::DS::EV& rEV = rDS.GetEV(iEV);
-            const RAT::DS::CalPMTs& calibratedPMTs = rEpV.GetCalPMTs();
+            const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
             if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
             if (evt_idx >= delays.size()) {
                 if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
@@ -299,7 +300,7 @@ TH1D* HitTimeResidualsMCPosition(const std::string& fileName, std::vector<double
 TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose, std::string fitName) {
     if (verbose) {std::cout << "Running HitTimeResidualsFitPosition()" << std::endl;}
 
-    TH1D* hHitTimeResiduals = new TH1D("hHitTimeResidualsFit", "Hit time residuals using the Fit position", 1300, -300.5, 999.5);
+    TH1D* histTimeResiduals = new TH1D("hHitTimeResidualsFit", "Hit time residuals using the Fit position", 1300, -300.5, 999.5);
     // If this is being done on data that does not require remote database connection
     // eg.: a simple simulation with default run number (0)
     // We can disable the remote connections:
@@ -378,8 +379,8 @@ TH1D* HitTimeResidualsFitPosition( const std::string& fileName, std::vector<doub
         }
     std::cout << "Number of events recorded = " << num_evts << std::endl;
 
-    hHitTimeResiduals->GetYaxis()->SetTitle( "Count per 1 ns bin" );
-    hHitTimeResiduals->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
-    hHitTimeResiduals->Draw();
-    return hHitTimeResiduals;
+    histTimeResiduals->GetYaxis()->SetTitle( "Count per 1 ns bin" );
+    histTimeResiduals->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
+    histTimeResiduals->Draw();
+    return histTimeResiduals;
 }

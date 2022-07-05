@@ -39,7 +39,7 @@
 #include <string>
 #include <fstream>
 
-std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool is_oPs, bool make_hists, bool verbose);
+std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, double vol_cut, bool is_oPs, bool make_hists, bool verbose);
 void printResults(const std::string& output_filename, std::vector<double> delays, std::vector<double> classier_results, std::vector<double> nhits_vec);
 
 int main(int argc, char** argv) {
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     std::string hist_filename = "Hists_" + filename + ".root";
 
     // Get e+ delays
-    std::vector<std::vector<double> > results = findPositronDelays_andClassification(file, hist_filename, is_oPs, make_hists, verbose);
+    std::vector<std::vector<double> > results = findPositronDelays_andClassification(file, hist_filename, 5700, is_oPs, make_hists, verbose);
     std::vector<double> delays = results.at(0);
     std::vector<double> classier_results = results.at(1);
     std::vector<double> nhits_vec = results.at(2);
@@ -72,10 +72,15 @@ int main(int argc, char** argv) {
 /**
  * @brief Returns a list of the delays imparted to positron decays (emulating oPs)
  * 
- * @param filename 
+ * @param input_filename 
+ * @param hist_filename 
+ * @param vol_cut  Radius of volume cut (mm)
+ * @param is_oPs 
+ * @param make_hists 
+ * @param verbose 
  * @return std::vector<double> 
  */
-std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, bool is_oPs, bool make_hists, bool verbose) {
+std::vector<std::vector<double> > findPositronDelays_andClassification(const std::string& input_filename, const std::string& hist_filename, double vol_cut, bool is_oPs, bool make_hists, bool verbose) {
     if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
 
     RAT::DB::Get()->SetAirplaneModeStatus(true);
