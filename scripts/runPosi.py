@@ -19,9 +19,9 @@ def argparser():
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
                         default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/splitSims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--pdf_repo', '-pr', type=str, dest='pdf_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/totSims/', help='Folder to save combined sim root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/PDFs/', help='Folder to save PDF text files in.')
 
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
@@ -29,8 +29,10 @@ def argparser():
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('---step', '-s', type=str, dest='step', default='all', choices=['sim', 'pdf', 'all'],
+    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf'],
                         help='which step of the process is it in?')
+    parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
+                    default=True, help='print and save extra info')
 
     args = parser.parse_args()
     return args
@@ -83,7 +85,7 @@ def getNevtsPerMacro(nevts_total, nevts_persim):
 
 def filename_format(particle, energy):
     '''returns string with simulation info to use in filenames'''
-    return 'Positronium_' + particle + '_' + energy
+    return 'Positronium_' + particle + '_' + str(energy)
 
 def job_str_map(jobName_str, particle, energy):
     '''Create code string to put at the start of the job file name, so that it can
@@ -104,7 +106,7 @@ def job_str_map(jobName_str, particle, energy):
 
     return map['job_type'][jobName_str] + '_' + map['particle'][particle] + '_' + str(energy)
 
-def makeJobArrayScript(particle, energy, jobName_str, example_jobScript, overall_folder, commandList_address, info, verbose):
+def makeJobArrayScript(jobName_str, example_jobScript, overall_folder, commandList_address, particle, energy, verbose):
     '''Create job script to run array of rat macros'''
 
     new_job_address = overall_folder + 'job_scripts/'
@@ -113,7 +115,7 @@ def makeJobArrayScript(particle, energy, jobName_str, example_jobScript, overall
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  'log_' + jobName_str + filename_format(info) + '.txt'
+    output_logFile_address +=  'log_' + jobName_str + filename_format(particle, energy) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -134,16 +136,16 @@ def makeJobArrayScript(particle, energy, jobName_str, example_jobScript, overall
 
     return new_job_address
 
-def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands, info, verbose):
+def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands, particle, energy, verbose):
     '''Create job script to run array of rat macros'''
 
     new_job_address = overall_folder + 'job_scripts/'
     new_job_address = checkRepo(new_job_address, verbose)
-    new_job_address += job_str_map(jobName_str, info) + '.job'
+    new_job_address += job_str_map(jobName_str, particle, energy) + '.job'
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  'log_' + jobName_str + filename_format(info) + '.txt'
+    output_logFile_address +=  'log_' + jobName_str + filename_format(particle, energy) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -214,7 +216,7 @@ def makeMacros(particle, energy, example_macro, save_macro_folder, save_sims_fol
             new_line = line.replace('oPs_output.root', output_address)
         elif '/generator/vtx/set e+ 0 0 0 1.0' in line:
             new_line = line.replace('e+', particle)
-            new_line = line.replace('1.0', energy)
+            new_line = line.replace('1.0', str(energy))
         elif '/rat/run/start 1000' in line:
             new_line = line.replace('/rat/run/start 1000', str(n_evts))
         else:
@@ -264,14 +266,14 @@ def runSims(args):
         commandList_file = open(commandList_address, 'w')
         for i in range(len(n_evts)):
             # Create all the macros
-            macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, n_evts[i], i)
+            macro_address = makeMacros(args.particle, energy, example_macro, save_macro_folder, save_sims_folder, n_evts[i], i)
             log_file_address = save_macro_folder + 'log_files/ratLog_' + filename_format(args.particle, energy) + '.log'
             macro_command = 'rat ' + macro_address + ' -l ' + log_file_address
             commandList_file.write(macro_command + '\n')
         commandList_file.close()
 
         # Create the job script to run all these macros in an array
-        new_job_address = makeJobArrayScript('sims_', example_jobScript, save_macro_folder, commandList_address, info, args.verbose)
+        new_job_address = makeJobArrayScript('sims_', example_jobScript, save_macro_folder, commandList_address, args.particle, energy, args.verbose)
         job_addresses.append(new_job_address)
 
 
@@ -325,7 +327,7 @@ def getPDF(args):
         for i in range(n_evts):
             command += ' ' + sim_file_format + '_' + str(i) + '.root'
 
-        new_job_address = makeJobSingleScript('pdf_', example_jobScript, save_sims_folder, command, args.verbose)
+        new_job_address = makeJobSingleScript('pdf_', example_jobScript, save_sims_folder, command, args.particle, energy, args.verbose)
         jobScript_addresses.append(new_job_address)
 
     # Wait until previous jobs are done
@@ -350,8 +352,7 @@ def main():
 
     work_modes = {
         'sim': runSims,
-        'pdf': getPDF,
-        #'all': runAll
+        'pdf': getPDF
     }
 
     result = work_modes[args.step](args)

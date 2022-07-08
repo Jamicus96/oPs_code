@@ -7,7 +7,7 @@
 
 # Run with: qsub jobSingle.job
 
-echo "Running AMELLIE job script"
+echo "Running positronium job script"
 module load sge
 #module load gcc/5.4.0
 # My rat source:
@@ -21,4 +21,4 @@ cd /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positron
 # Run commands
 your commands
 
-echo "Finished AMELLIE job."
+echo "Finished positronium job."

@@ -7,7 +7,7 @@
 
 # Run with: qsub -t 1-N jobArray.job
 
-echo "Running AMELLIE job array job script"
+echo "Running positronium job array job script"
 module load sge
 #module load gcc/5.4.0
 # My rat source:
@@ -25,4 +25,4 @@ COMMAND=$(sed "$SGE_TASK_ID"'q;d' ${COMMAND_LIST_FILE})
 # Run commands in a row
 $COMMAND
 
-echo "Finished AMELLIE job array from <<<${COMMAND_LIST_FILE}>>>, line number <<<$SGE_TASK_ID>>>."
+echo "Finished positronium job array from <<<${COMMAND_LIST_FILE}>>>, line number <<<$SGE_TASK_ID>>>."
