@@ -7,7 +7,7 @@
 
 # Set o-Ps values (formation fraction, lifetime, and whether decay time is taken from a
 # random distribution based on the lifetime or is hardcoded as the lifetime itself)
-#/rat/db/set POSITRONIUM formfrac 1.0
+/rat/db/set POSITRONIUM formfrac 1.0
 #/rat/db/set POSITRONIUM lifetime 15.0
 #/rat/db/set POSITRONIUM random false
 
@@ -45,5 +45,5 @@
 /generator/rate/set 1
 
 # start the simulation with 100 events
-/rat/run/start 100
+/rat/run/start 1000
 exit

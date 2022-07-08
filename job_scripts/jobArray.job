@@ -1,0 +1,28 @@
+#$ -S /bin/bash
+#$ -cwd
+#$ -q smp.q@@EPP
+#$ -j y
+#$ -o output_log.txt
+##############################################
+
+# Run with: qsub -t 1-N jobArray.job
+
+echo "Running AMELLIE job array job script"
+module load sge
+#module load gcc/5.4.0
+# My rat source:
+#source /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/rat_source.sh
+# RAT7 using ROOT5:
+#source /research/epp/neutrino/snoplus/RAT7/env_rat-7.0.5.sh
+# RAT7 using ROOT6
+source /research/epp/neutrino/snoplus/RAT7/install/env_rat-7.0.5.sh
+cd /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/
+
+# Read in file names from list file
+COMMAND_LIST_FILE="/Address/CommandList.txt"
+COMMAND=$(sed "$SGE_TASK_ID"'q;d' ${COMMAND_LIST_FILE})
+
+# Run commands in a row
+$COMMAND
+
+echo "Finished AMELLIE job array from <<<${COMMAND_LIST_FILE}>>>, line number <<<$SGE_TASK_ID>>>."
