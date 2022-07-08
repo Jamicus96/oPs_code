@@ -16,7 +16,7 @@ module load sge
 #source /research/epp/neutrino/snoplus/RAT7/env_rat-7.0.5.sh
 # RAT7 using ROOT6
 source /research/epp/neutrino/snoplus/RAT7/install/env_rat-7.0.5.sh
-cd /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/
+cd /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/
 
 # Run commands
 your commands
