@@ -11,11 +11,11 @@ echo "Running positronium job script"
 module load sge
 #module load gcc/5.4.0
 # My rat source:
-#source /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/rat_source.sh
+source /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/rat_source.sh
 # RAT7 using ROOT5:
 #source /research/epp/neutrino/snoplus/RAT7/env_rat-7.0.5.sh
 # RAT7 using ROOT6
-source /research/epp/neutrino/snoplus/RAT7/install/env_rat-7.0.5.sh
+#source /research/epp/neutrino/snoplus/RAT7/install/env_rat-7.0.5.sh
 cd /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/
 
 # Run commands
