@@ -3,7 +3,8 @@
 /rat/physics_list/OmitHadronicProcesses true
 
 # Set the detector geometry and noise rate database entries used in the simulation
-/rat/db/set DETECTOR geo_file "geo/snoplusnative_te.geo"
+/rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
+/rat/db/set GEO[inner_av] material "labppo_1p1_berkeley_scintillator"
 
 # Set o-Ps values (formation fraction, lifetime, and whether decay time is taken from a
 # random distribution based on the lifetime or is hardcoded as the lifetime itself)

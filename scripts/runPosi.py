@@ -12,9 +12,9 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--particle', '-p', type=str, dest='particle',
-                        default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma'], help='Which particle to simulate')
-    parser.add_argument('--energies', '-e', type=list, dest='energies',
-                        default=[1.0], help='List of particle energies to simulate (MeV)')
+                        default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma', 'alpha'], help='Which particle to simulate')
+    parser.add_argument('--energies', '-e', type=str, dest='energies',
+                        default=[1.0], help='List of particle energies to simulate (MeV), Input as [1.0,2.0,3.0] for ex')
 
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
                         default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/macros/', help='Folder to save Region-selected root files in.')
@@ -29,7 +29,7 @@ def argparser():
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf'],
+    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf', 'sim-pdf'],
                         help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')
@@ -100,7 +100,8 @@ def job_str_map(jobName_str, particle, energy):
             'o-Ps': 'oP',
             'e+': 'e+',
             'e-': 'e-',
-            'gamma': 'gm'
+            'gamma': 'gm',
+            'alpha': 'al'
         }
     }
 
@@ -184,7 +185,7 @@ def checkJobsDone(jobName_str, particle, energies, wait_time, verbose):
                     map_str = job_str_map(jobName_str, particle, energy)
                     if len(map_str) > 10:
                         map_str = map_str[:9]
-                    if job_str_map(jobName_str, particle, energy) in line:
+                    if map_str in line:
                         running = True
                         if verbose:
                             print('Waiting for jobs to finish...')
@@ -206,19 +207,17 @@ def makeMacros(particle, energy, example_macro, save_macro_folder, save_sims_fol
     new_macro = []
     for line in example_macro:
         # Replace placeholders in macro
-        if '/rat/db/set POSITRONIUM formfrac 1.0' in line:
-            if particle != 'o-Ps':
-                new_line = line.replace('1.0', '0.0')
-        elif '/rat/tracking/omit e-' in line:
-            if particle == 'e-':
-                new_line = line.replace('/rat/tracking/omit e-', '')
+        if ('/rat/db/set POSITRONIUM formfrac 1.0' in line) and (particle != 'o-Ps'):
+            new_line = line.replace('1.0', '0.0')
+        elif ('/rat/tracking/omit e-' in line) and (particle == 'e-'):
+            new_line = line.replace('/rat/tracking/omit e-', '')
         elif '/rat/procset file "oPs_output.root"' in line:
             new_line = line.replace('oPs_output.root', output_address)
         elif '/generator/vtx/set e+ 0 0 0 1.0' in line:
             new_line = line.replace('e+', particle)
             new_line = line.replace('1.0', str(energy))
         elif '/rat/run/start 1000' in line:
-            new_line = line.replace('/rat/run/start 1000', str(n_evts))
+            new_line = line.replace('1000', str(n_evts))
         else:
             new_line = line
 
@@ -260,7 +259,8 @@ def runSims(args):
     ### MAKE MACROS AND JOB SCRIPTS TO RUN THE SIMULATIONS ###
     print('Creating macros and job scripts...')
     job_addresses = []
-    for energy in args.energies:
+    energies = map(float, args.energies.strip('[]').split(','))
+    for energy in energies:
         # Make list of commands for job array to call
         commandList_address = jobScript_repo + 'sim_commandList_' + filename_format(args.particle, energy) + '.txt'
         commandList_file = open(commandList_address, 'w')
@@ -313,7 +313,8 @@ def getPDF(args):
     print('Creating analysis job scripts...')
     jobScript_addresses = []
     command_base = repo_address + 'scripts/getPDF.exe '
-    for energy in args.energies:
+    energies = map(float, args.energies.strip('[]').split(','))
+    for energy in energies:
         output_file = save_pdf_folder + 'PDFs_' + filename_format(args.particle, energy) + '.txt'
 
         command = command_base + output_file
@@ -321,28 +322,35 @@ def getPDF(args):
             command += ' ' + str(1)
         else:
             command += ' ' + str(0)
-        command += ' ' + args.verbose
+        command += ' ' + str(int(args.verbose))
 
         sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.particle, energy)
-        for i in range(n_evts):
+        for i in range(len(n_evts)):
             command += ' ' + sim_file_format + '_' + str(i) + '.root'
 
         new_job_address = makeJobSingleScript('pdf_', example_jobScript, save_sims_folder, command, args.particle, energy, args.verbose)
         jobScript_addresses.append(new_job_address)
 
     # Wait until previous jobs are done
-    checkJobsDone('sims_', args.particle, args.energies, 10, args.verbose)
+    checkJobsDone('sims_', args.particle, energies, 10, args.verbose)
 
     ### RUN JOB SCRIPTS ###
     print('Submitting job(s)...')
     for job_address in jobScript_addresses:
-        command = 'qsub ' + job_address
+        # For higher energies, the jobs need more memory, otherwise they get killed
+        command = 'qsub -l m_mem_free=4G ' + job_address
         if args.verbose:
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     return True
 
+
+### COMBINATIONS ###
+
+# def runSim_getPDF(args):
+#     result = runSims(args)
+#     return result and getPDF(args)
 
 ### MAIN ###
 
@@ -352,7 +360,8 @@ def main():
 
     work_modes = {
         'sim': runSims,
-        'pdf': getPDF
+        'pdf': getPDF,
+        #'sim-pdf': runSim_getPDF
     }
 
     result = work_modes[args.step](args)

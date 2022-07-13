@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
         std::cout << "Creating output histogram file name" << std::endl;
         std::size_t botDirPos = output_file.find_last_of("/");
         std::string filename = output_file.substr(botDirPos+1, output_file.length() - 5);
-        std::string path = output_file.substr(0, botDirPos);
+        std::string path = output_file.substr(0, botDirPos+1);
         std::string saveroot = path + "Hists_" + filename + ".root";
 
         // Save root file
