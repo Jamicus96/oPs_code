@@ -22,6 +22,8 @@ def argparser():
                         default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--pdf_repo', '-pr', type=str, dest='pdf_repo',
                         default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/PDFs/', help='Folder to save PDF text files in.')
+    parser.add_argument('--class_repo', '-cr', type=str, dest='class_repo',
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/Classifications/', help='Folder to save Classifier result text files in.')
 
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
@@ -29,7 +31,7 @@ def argparser():
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf', 'sim-pdf'],
+    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf', 'class'],
                         help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')
@@ -94,7 +96,8 @@ def job_str_map(jobName_str, particle, energy):
     map = {
         'job_type': {
             'sims_': 'S',
-            'pdf_': 'P'
+            'pdf_': 'P',
+            'class_': 'C'
         },
         'particle': {
             'o-Ps': 'oP',
@@ -345,6 +348,60 @@ def getPDF(args):
 
     return True
 
+def getClassification(args):
+    '''Compute stats'''
+    print('Running getClassification().')
+
+    # Read in example macro and job script + info
+    repo_address = getRepoAddress()
+
+    # Make sure folders are of the correct format to  use later
+    save_sims_folder = checkRepo(args.sim_repo, args.verbose)
+    save_class_folder = checkRepo(args.class_repo, args.verbose)
+
+    # Get example job script
+    example_jobScript_address = repo_address + 'job_scripts/jobSingle.job'
+    with open(example_jobScript_address, "r") as f:
+        example_jobScript = f.readlines()
+
+    # How simulations were split up
+    n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
+
+    ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
+    print('Creating analysis job scripts...')
+    jobScript_addresses = []
+    command_base = repo_address + 'scripts/ClassifierResults.exe '
+    energies = map(float, args.energies.strip('[]').split(','))
+    for energy in energies:
+        output_file = save_class_folder + 'Classified_' + filename_format(args.particle, energy) + '.txt'
+
+        command = command_base + output_file
+        if args.particle == 'o-Ps':
+            command += ' ' + str(1)
+        else:
+            command += ' ' + str(0)
+        command += ' ' + str(int(args.verbose)) + ' ' + str(int(args.verbose))
+
+        sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.particle, energy)
+        for i in range(len(n_evts)):
+            command += ' ' + sim_file_format + '_' + str(i) + '.root'
+
+        new_job_address = makeJobSingleScript('class_', example_jobScript, save_sims_folder, command, args.particle, energy, args.verbose)
+        jobScript_addresses.append(new_job_address)
+
+    # Wait until previous jobs are done
+    checkJobsDone('sims_', args.particle, energies, 10, args.verbose)
+
+    ### RUN JOB SCRIPTS ###
+    print('Submitting job(s)...')
+    for job_address in jobScript_addresses:
+        # For higher energies, the jobs need more memory, otherwise they get killed
+        command = 'qsub -l m_mem_free=4G ' + job_address
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
 
 ### COMBINATIONS ###
 
@@ -361,7 +418,7 @@ def main():
     work_modes = {
         'sim': runSims,
         'pdf': getPDF,
-        #'sim-pdf': runSim_getPDF
+        'class': getClassification
     }
 
     result = work_modes[args.step](args)

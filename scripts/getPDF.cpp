@@ -149,6 +149,7 @@ std::vector<std::vector<double> > findPositronDelays(const std::vector<std::stri
                 } //Primary Particle Tracks
             }
         } //event
+        dsReader.Delete();
     }
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
@@ -291,6 +292,7 @@ TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std:
                 }
             }
         }
+        dsReader.Delete();
     }
     std::cout << "Number of events recorded = " << num_evts << std::endl;
 
@@ -392,6 +394,7 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
                 ++evt_idx;
             }
         }
+        dsReader.Delete();
     }
     std::cout << "Number of events recorded = " << num_evts << std::endl;
 
