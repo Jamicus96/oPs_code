@@ -14,7 +14,7 @@ def argparser():
     parser.add_argument('--particle', '-p', type=str, dest='particle',
                         default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma', 'alpha'], help='Which particle to simulate')
     parser.add_argument('--energies', '-e', type=str, dest='energies',
-                        default=[1.0], help='List of particle energies to simulate (MeV), Input as [1.0,2.0,3.0] for ex')
+                        default='[1.0]', help='List of particle energies to simulate (MeV), Input as [1.0,2.0,3.0] for ex')
 
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
                         default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/macros/', help='Folder to save Region-selected root files in.')
@@ -218,7 +218,7 @@ def makeMacros(particle, energy, example_macro, save_macro_folder, save_sims_fol
             new_line = line.replace('oPs_output.root', output_address)
         elif '/generator/vtx/set e+ 0 0 0 1.0' in line:
             new_line = line.replace('e+', particle)
-            new_line = line.replace('1.0', str(energy))
+            new_line = new_line.replace('1.0', str(energy))
         elif '/rat/run/start 1000' in line:
             new_line = line.replace('1000', str(n_evts))
         else:

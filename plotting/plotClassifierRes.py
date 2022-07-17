@@ -11,14 +11,26 @@ save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/a
 
 ############ Plotting Funcs #############
 
-def plotLL(data):
-    scaled_oPs_LLdiff = data['o-Ps']['classifications'] / data['o-Ps']['nhits']
-    scaled_elec_LLdiff = data['e-']['classifications'] / data['e-']['nhits']
+def plotnhits(nhits):
+    plt.figure(figsize=(10, 7), dpi=100)
+    bins = 10**(np.linspace(0, 4, 200))
+    for particle in nhits:
+        plt.hist(x = nhits[particle], bins = bins, alpha=0.5, rwidth=0.85, label = particle)
+    plt.legend(loc='best')
+    #plt.xlim([-50, 50])
+    plt.xlabel('Nhits')
+    plt.xscale('log')
+    plt.yscale('log')
+    # plt.show()
+    plt.savefig(save_fig_repo + 'o-Ps_nhits.png', dpi=1000)
+    plt.close()
 
+def plotLL(data):
     plt.figure(figsize=(10, 7), dpi=100)
     bins = np.arange(-0.02, 0.08, 0.001)
-    plt.hist(x = scaled_oPs_LLdiff, bins = bins, color = 'b', alpha=0.5, rwidth=0.85, label = 'o-Ps')
-    plt.hist(x = scaled_elec_LLdiff, bins = bins, color = 'r', alpha=0.5, rwidth=0.85, label = 'e-')
+    for particle in data:
+        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        plt.hist(x = scaled_LLdiff, bins = bins, alpha=0.5, rwidth=0.85, label = particle)
     plt.legend(loc='best')
     #plt.xlim([-50, 50])
     plt.xlabel('log-Likelyhood difference divided by nhit')
@@ -27,12 +39,10 @@ def plotLL(data):
     plt.close()
 
 def plotLLvsDelay(data):
-    scaled_oPs_LLdiff = data['o-Ps']['classifications'] / data['o-Ps']['nhits']
-    scaled_elec_LLdiff = data['e-']['classifications'] / data['e-']['nhits']
-
     plt.figure(figsize=(10, 7), dpi=100)
-    plt.scatter(data['o-Ps']['delays'], scaled_oPs_LLdiff, label='o-Ps')
-    plt.scatter(data['e-']['delays'], scaled_elec_LLdiff, label='e-')
+    for particle in data:
+        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        plt.scatter(data[particle]['delays'], scaled_LLdiff, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('decay time (ns)')
@@ -46,12 +56,10 @@ def plotLLvsDelay(data):
     plt.close()
 
 def plotLLvsEnergy(data):
-    scaled_oPs_LLdiff = data['o-Ps']['classifications'] / data['o-Ps']['nhits']
-    scaled_elec_LLdiff = data['e-']['classifications'] / data['e-']['nhits']
-
     plt.figure(figsize=(10, 7), dpi=100)
-    plt.scatter(data['o-Ps']['energies'], scaled_oPs_LLdiff, label='o-Ps')
-    plt.scatter(data['e-']['energies'], scaled_elec_LLdiff, label='e-')
+    for particle in data:
+        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        plt.scatter(data[particle]['energies'], scaled_LLdiff, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Reconstructed Event Energy (MeV)')
@@ -65,12 +73,10 @@ def plotLLvsEnergy(data):
     plt.close()
 
 def plotLLvsNhit(data):
-    scaled_oPs_LLdiff = data['o-Ps']['classifications'] / data['o-Ps']['nhits']
-    scaled_elec_LLdiff = data['e-']['classifications'] / data['e-']['nhits']
-
     plt.figure(figsize=(10, 7), dpi=100)
-    plt.scatter(data['o-Ps']['nhits'], scaled_oPs_LLdiff, label='o-Ps')
-    plt.scatter(data['e-']['nhits'], scaled_elec_LLdiff, label='e-')
+    for particle in data:
+        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        plt.scatter(data[particle]['nhits'], scaled_LLdiff, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
@@ -85,8 +91,8 @@ def plotLLvsNhit(data):
 
 def plotEnergyvsNhit(data):
     plt.figure(figsize=(10, 7), dpi=100)
-    plt.scatter(data['o-Ps']['nhits'], data['o-Ps']['energies'], label='o-Ps')
-    plt.scatter(data['e-']['nhits'], data['e-']['energies'], label='e-')
+    for particle in data:
+        plt.scatter(data[particle]['nhits'], data[particle]['energies'], label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
@@ -101,8 +107,8 @@ def plotEnergyvsNhit(data):
 
 def plotDelayvsEnergy(data):
     plt.figure(figsize=(10, 7), dpi=100)
-    plt.scatter(data['o-Ps']['energies'], data['o-Ps']['delays'], label='o-Ps')
-    plt.scatter(data['e-']['energies'], data['e-']['delays'], label='e-')
+    for particle in data:
+        plt.scatter(data[particle]['energies'], data[particle]['delays'], label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Reconstructed Event Energy (MeV)')
@@ -117,8 +123,8 @@ def plotDelayvsEnergy(data):
 
 def plotDelayvsNhit(data):
     plt.figure(figsize=(10, 7), dpi=100)
-    plt.scatter(data['o-Ps']['nhits'], data['o-Ps']['delays'], label='o-Ps')
-    plt.scatter(data['e-']['nhits'], data['e-']['delays'], label='e-')
+    for particle in data:
+        plt.scatter(data[particle]['nhits'], data[particle]['delays'], label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
@@ -172,22 +178,23 @@ def main():
     f.close()
 
     new_data = {}
+    full_nhits = {}
     for particle in data:
+        full_nhits[particle] = []
         new_data[particle] = {}
         new_data[particle]['classifications'] = []
         new_data[particle]['delays'] = []
         new_data[particle]['nhits'] = []
         new_data[particle]['energies'] = []
         for energy in data[particle]:
-            if energy != '1.0':
+            if not (energy == '1.0' or (energy == '2.0' and particle == 'e-')):
                 continue
             for i in range(len(data[particle][energy]['Classifier_results'])):
                 recon_energy = data[particle][energy]['recon_event_energies'][i]
-                new_data[particle]['classifications'].append(data[particle][energy]['Classifier_results'][i])
-                new_data[particle]['delays'].append(data[particle][energy]['delays'][i])
-                new_data[particle]['nhits'].append(data[particle][energy]['nhits'][i])
-                new_data[particle]['energies'].append(recon_energy)
-                if recon_energy > 50 or recon_energy < 1:
+                nhits = data[particle][energy]['nhits'][i]
+                full_nhits[particle].append(nhits)
+                #if recon_energy > 50 or recon_energy < 1:
+                if nhits > 1000 or nhits < 200:
                     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
                     print(i)
                     print('particle: ', particle)
@@ -196,12 +203,18 @@ def main():
                     print('delay: ', data[particle][energy]['delays'][i])
                     print('nhit: ', data[particle][energy]['nhits'][i])
                     print('recon_event_energy: ', data[particle][energy]['recon_event_energies'][i])
+                    #continue
+                new_data[particle]['classifications'].append(data[particle][energy]['Classifier_results'][i])
+                new_data[particle]['delays'].append(data[particle][energy]['delays'][i])
+                new_data[particle]['nhits'].append(nhits)
+                new_data[particle]['energies'].append(recon_energy)
         new_data[particle]['classifications'] = np.array(new_data[particle]['classifications'])
         new_data[particle]['delays'] = np.array(new_data[particle]['delays'])
         new_data[particle]['nhits'] = np.array(new_data[particle]['nhits'])
         new_data[particle]['energies'] = np.array(new_data[particle]['energies'])
 
     # Plotting:
+    plotnhits(full_nhits)
     plotLL(new_data)
     plotLLvsDelay(new_data)
     plotLLvsEnergy(new_data)
@@ -209,7 +222,9 @@ def main():
     plotEnergyvsNhit(new_data)
     plotDelayvsEnergy(new_data)
     plotDelayvsNhit(new_data)
-    plotROC(new_data)
+    if 'o-Ps' in new_data and 'e-' in new_data:
+        if len(new_data['o-Ps']['classifications']) > 0 and len(new_data['e-']['classifications']) > 0:
+            plotROC(new_data)
 
 if __name__ == '__main__':
     main()
