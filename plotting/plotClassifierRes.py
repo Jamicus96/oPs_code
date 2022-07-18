@@ -1,7 +1,4 @@
 import numpy as np
-import matplotlib
-matplotlib.use('pdf')
-import matplotlib.pyplot as plt
 import json
 
 json_file = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/Classifier_stats.json'
@@ -12,6 +9,10 @@ show = False
 # save_fig_repo = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Plots/'
 # show = True
 
+if not show:
+    import matplotlib
+    matplotlib.use('pdf')
+import matplotlib.pyplot as plt
 
 ######## OTHER #######
 
@@ -26,8 +27,8 @@ def applyCuts(data):
         new_data[particle]['nhits'] = []
         new_data[particle]['energies'] = []
         for energy in data[particle]:
-            if not (energy == '1.0' or (energy == '2.0' and particle == 'e-')):
-                continue
+            # if not (energy == '1.0' or (energy == '2.0' and particle == 'e-')):
+            #     continue
             for i in range(len(data[particle][energy]['Classifier_results'])):
                 recon_energy = data[particle][energy]['recon_event_energies'][i]
                 nhits = data[particle][energy]['nhits'][i]
