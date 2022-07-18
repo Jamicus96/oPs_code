@@ -4,16 +4,14 @@ matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import json
 
-# json_file = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/Classifier_stats.json'
-# save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/plots/'
-# show = False
+json_file = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/Classifier_stats.json'
+save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/plots/'
+show = False
 
-json_file = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Classifier_stats.json'
-save_fig_repo = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Plots/'
-show = True
+# json_file = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Classifier_stats.json'
+# save_fig_repo = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Plots/'
+# show = True
 
-# oPs_scaled_logLdiff = oPs_logLdiff / oPs_nhits
-# elec_scaled_logLdiff = elec_logLdiff / elec_nhits
 
 ######## OTHER #######
 
