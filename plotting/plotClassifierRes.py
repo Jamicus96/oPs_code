@@ -4,12 +4,57 @@ matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import json
 
-json_file = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/Classifier_stats.json'
-save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/plots/'
+# json_file = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/Classifier_stats.json'
+# save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/plots/'
+# show = False
 
+json_file = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Classifier_stats.json'
+save_fig_repo = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Plots/'
+show = True
 
 # oPs_scaled_logLdiff = oPs_logLdiff / oPs_nhits
 # elec_scaled_logLdiff = elec_logLdiff / elec_nhits
+
+######## OTHER #######
+
+def applyCuts(data):
+    new_data = {}
+    full_nhits = {}
+    for particle in data:
+        full_nhits[particle] = []
+        new_data[particle] = {}
+        new_data[particle]['classifications'] = []
+        new_data[particle]['delays'] = []
+        new_data[particle]['nhits'] = []
+        new_data[particle]['energies'] = []
+        for energy in data[particle]:
+            if not (energy == '1.0' or (energy == '2.0' and particle == 'e-')):
+                continue
+            for i in range(len(data[particle][energy]['Classifier_results'])):
+                recon_energy = data[particle][energy]['recon_event_energies'][i]
+                nhits = data[particle][energy]['nhits'][i]
+                full_nhits[particle].append(nhits)
+                #if recon_energy > 50 or recon_energy < 1:
+                # if nhits > 1000 or nhits < 200:
+                #     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                #     print(i)
+                #     print('particle: ', particle)
+                #     print('simulated particle energy: ', energy)
+                #     print('Classifier_result: ', data[particle][energy]['Classifier_results'][i])
+                #     print('delay: ', data[particle][energy]['delays'][i])
+                #     print('nhit: ', data[particle][energy]['nhits'][i])
+                #     print('recon_event_energy: ', data[particle][energy]['recon_event_energies'][i])
+                #     #continue
+                new_data[particle]['classifications'].append(data[particle][energy]['Classifier_results'][i])
+                new_data[particle]['delays'].append(data[particle][energy]['delays'][i])
+                new_data[particle]['nhits'].append(nhits)
+                new_data[particle]['energies'].append(recon_energy)
+        new_data[particle]['classifications'] = np.array(new_data[particle]['classifications'])
+        new_data[particle]['delays'] = np.array(new_data[particle]['delays'])
+        new_data[particle]['nhits'] = np.array(new_data[particle]['nhits'])
+        new_data[particle]['energies'] = np.array(new_data[particle]['energies'])
+
+    return new_data, full_nhits
 
 ############ Plotting Funcs #############
 
@@ -23,9 +68,11 @@ def plotnhits(nhits):
     plt.xlabel('Nhits')
     plt.xscale('log')
     plt.yscale('log')
-    # plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_nhits.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_nhits.png', dpi=1000)
+        plt.close()
 
 def plotLL(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -36,9 +83,11 @@ def plotLL(data):
     plt.legend(loc='best')
     #plt.xlim([-50, 50])
     plt.xlabel('log-Likelyhood difference divided by nhit')
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_LLdiff.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_LLdiff.png', dpi=1000)
+        plt.close()
 
 def plotLLvsDelay(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -53,9 +102,11 @@ def plotLLvsDelay(data):
     plt.legend(loc='best')
     #plt.xlim([-10, 100])
     #plt.ylim([-0.14, 0.065])
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_LLdiff_delays.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_LLdiff_delays.png', dpi=1000)
+        plt.close()
 
 def plotLLvsEnergy(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -70,9 +121,11 @@ def plotLLvsEnergy(data):
     plt.legend(loc='best')
     plt.xlim([-1, 5])
     #plt.ylim([-0.14, 0.065])
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_LLdiff_energies.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_LLdiff_energies.png', dpi=1000)
+        plt.close()
 
 def plotLLvsNhit(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -87,9 +140,11 @@ def plotLLvsNhit(data):
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
     #plt.ylim([-0.14, 0.065])
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_LLdiff_nhits.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_LLdiff_nhits.png', dpi=1000)
+        plt.close()
 
 def plotEnergyvsNhit(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -103,9 +158,11 @@ def plotEnergyvsNhit(data):
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
     #plt.ylim([-0.14, 0.065])
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_energies_nhits.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_energies_nhits.png', dpi=1000)
+        plt.close()
 
 def plotDelayvsEnergy(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -119,9 +176,11 @@ def plotDelayvsEnergy(data):
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
     #plt.ylim([-0.14, 0.065])
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_delays_nhits.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_delays_nhits.png', dpi=1000)
+        plt.close()
 
 def plotDelayvsNhit(data):
     plt.figure(figsize=(10, 7), dpi=100)
@@ -135,9 +194,11 @@ def plotDelayvsNhit(data):
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
     #plt.ylim([-0.14, 0.065])
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_delays_nhits.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_delays_nhits.png', dpi=1000)
+        plt.close()
 
 def plotROC(data):
     scaled_oPs_LLdiff = data['o-Ps']['classifications'] / data['o-Ps']['nhits']
@@ -168,9 +229,11 @@ def plotROC(data):
     plt.xlabel('Percentage of noise (e-) that passes cut')
     plt.ylabel('Percentage of signal (o-Ps) that passes cut')
     plt.title('Positronium Classifier ROC curve')
-    #plt.show()
-    plt.savefig(save_fig_repo + 'o-Ps_ROC_curve.png', dpi=1000)
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_ROC_curve.png', dpi=1000)
+        plt.close()
 
 ############### MAIN ################
 
@@ -179,54 +242,20 @@ def main():
     data = json.load(f)
     f.close()
 
-    new_data = {}
-    full_nhits = {}
-    for particle in data:
-        full_nhits[particle] = []
-        new_data[particle] = {}
-        new_data[particle]['classifications'] = []
-        new_data[particle]['delays'] = []
-        new_data[particle]['nhits'] = []
-        new_data[particle]['energies'] = []
-        for energy in data[particle]:
-            if not (energy == '1.0' or (energy == '2.0' and particle == 'e-')):
-                continue
-            for i in range(len(data[particle][energy]['Classifier_results'])):
-                recon_energy = data[particle][energy]['recon_event_energies'][i]
-                nhits = data[particle][energy]['nhits'][i]
-                full_nhits[particle].append(nhits)
-                #if recon_energy > 50 or recon_energy < 1:
-                if nhits > 1000 or nhits < 200:
-                    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-                    print(i)
-                    print('particle: ', particle)
-                    print('simulated particle energy: ', energy)
-                    print('Classifier_result: ', data[particle][energy]['Classifier_results'][i])
-                    print('delay: ', data[particle][energy]['delays'][i])
-                    print('nhit: ', data[particle][energy]['nhits'][i])
-                    print('recon_event_energy: ', data[particle][energy]['recon_event_energies'][i])
-                    #continue
-                new_data[particle]['classifications'].append(data[particle][energy]['Classifier_results'][i])
-                new_data[particle]['delays'].append(data[particle][energy]['delays'][i])
-                new_data[particle]['nhits'].append(nhits)
-                new_data[particle]['energies'].append(recon_energy)
-        new_data[particle]['classifications'] = np.array(new_data[particle]['classifications'])
-        new_data[particle]['delays'] = np.array(new_data[particle]['delays'])
-        new_data[particle]['nhits'] = np.array(new_data[particle]['nhits'])
-        new_data[particle]['energies'] = np.array(new_data[particle]['energies'])
+    cut_data, full_nhits = applyCuts(data)
 
     # Plotting:
     plotnhits(full_nhits)
-    plotLL(new_data)
-    plotLLvsDelay(new_data)
-    plotLLvsEnergy(new_data)
-    plotLLvsNhit(new_data)
-    plotEnergyvsNhit(new_data)
-    plotDelayvsEnergy(new_data)
-    plotDelayvsNhit(new_data)
-    if 'o-Ps' in new_data and 'e-' in new_data:
-        if len(new_data['o-Ps']['classifications']) > 0 and len(new_data['e-']['classifications']) > 0:
-            plotROC(new_data)
+    plotLL(cut_data)
+    plotLLvsDelay(cut_data)
+    plotLLvsEnergy(cut_data)
+    plotLLvsNhit(cut_data)
+    plotEnergyvsNhit(cut_data)
+    plotDelayvsEnergy(cut_data)
+    plotDelayvsNhit(cut_data)
+    if 'o-Ps' in cut_data and 'e-' in cut_data:
+        if len(cut_data['o-Ps']['classifications']) > 0 and len(cut_data['e-']['classifications']) > 0:
+            plotROC(cut_data)
 
 if __name__ == '__main__':
     main()
