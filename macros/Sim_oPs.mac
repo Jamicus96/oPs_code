@@ -40,8 +40,9 @@
 /rat/procset file "oPs_output.root"
 
 # Now specify the events to generate and pass to the event loop
-/generator/add combo gun:fill:poisson
-/generator/vtx/set e+ 0 0 0 1.0
+/generator/add combo gun2:fill:poisson
+#/generator/vtx/set pname px py pz angle E1 E2 [polx poly polz]
+/generator/vtx/set e+ 0 0 0 0 0.5 9.0
 /generator/pos/set 0.0 0.0 0.0
 /generator/rate/set 1
 

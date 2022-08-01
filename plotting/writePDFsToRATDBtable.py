@@ -44,8 +44,8 @@ def rewriteTABLE():
             elec_str += str(prob) + ', '
         elec_str = elec_str[:-2] + ']'
 
-        oPs_recon_energies += str(float(oPs_energy) + 1.0)
-        elec_recon_energies += elec_energy
+        oPs_recon_energies += '"' + str(float(oPs_energy) + 1.0) + '"'
+        elec_recon_energies += '"' + elec_energy + '"'
         if oPs_energy != energies[len(energies) - 1][0]:
             oPs_str += ','
             elec_str += ','
@@ -55,10 +55,10 @@ def rewriteTABLE():
         elec_lines.append(elec_str + '\n')
         oPs_lines.append(oPs_str + '\n')
 
-    oPs_recon_energies += ']\n'
-    elec_recon_energies += ']\n'
+    oPs_recon_energies += '],\n'
+    elec_recon_energies += '],\n'
+    oPs_lines.append('    },\n')
     elec_lines.append('    }\n')
-    oPs_lines.append('    }\n')
 
     # Put it all together
     new_lines = pre_prob_lines + [oPs_recon_energies] + ['\n'] + [elec_recon_energies] + ['\n'] + oPs_lines + ['\n'] + elec_lines + ['  }\n']

@@ -367,6 +367,7 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
 
                 // calculate time residuals
                 const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
+                unsigned int nhits = rEV.GetNhitsCleaned();
                 if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
                 if (evt_idx >= delays.size()) {
                     if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
@@ -378,6 +379,10 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
                     continue;
                 } else if (eventPosition.Mag() > vol_cut) {
                     if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
+                    ++evt_idx;
+                    continue;
+                } else if (nhits < 200 || nhits > 6000) {
+                    if (verbose) {std::cout << "Outside nhit cut, ignoring event." << std::endl;}
                     ++evt_idx;
                     continue;
                 } else {

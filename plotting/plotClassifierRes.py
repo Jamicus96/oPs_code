@@ -2,7 +2,7 @@ import numpy as np
 import json
 
 json_file = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/Classifier_stats.json'
-save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/plots/'
+save_fig_repo = '/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/plots/E_range/'
 show = False
 
 # json_file = '/Users/jp643/Documents/Studies/PhD/Antinu/Positronium/Results/Classifier_stats.json'
@@ -27,23 +27,22 @@ def applyCuts(data):
         new_data[particle]['nhits'] = []
         new_data[particle]['energies'] = []
         for energy in data[particle]:
-            # if not (energy == '1.0' or (energy == '2.0' and particle == 'e-')):
-            #     continue
+            if not (energy == '0.5-9.0' or energy == '1.5-10.0'):
+                continue
             for i in range(len(data[particle][energy]['Classifier_results'])):
                 recon_energy = data[particle][energy]['recon_event_energies'][i]
                 nhits = data[particle][energy]['nhits'][i]
                 full_nhits[particle].append(nhits)
-                #if recon_energy > 50 or recon_energy < 1:
-                # if nhits > 1000 or nhits < 200:
-                #     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-                #     print(i)
-                #     print('particle: ', particle)
-                #     print('simulated particle energy: ', energy)
-                #     print('Classifier_result: ', data[particle][energy]['Classifier_results'][i])
-                #     print('delay: ', data[particle][energy]['delays'][i])
-                #     print('nhit: ', data[particle][energy]['nhits'][i])
-                #     print('recon_event_energy: ', data[particle][energy]['recon_event_energies'][i])
-                #     #continue
+                if nhits > 6000 or nhits < 200:
+                    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                    print(i)
+                    print('particle: ', particle)
+                    print('simulated particle energy: ', energy)
+                    print('Classifier_result: ', data[particle][energy]['Classifier_results'][i])
+                    print('delay: ', data[particle][energy]['delays'][i])
+                    print('nhit: ', data[particle][energy]['nhits'][i])
+                    print('recon_event_energy: ', data[particle][energy]['recon_event_energies'][i])
+                    continue
                 new_data[particle]['classifications'].append(data[particle][energy]['Classifier_results'][i])
                 new_data[particle]['delays'].append(data[particle][energy]['delays'][i])
                 new_data[particle]['nhits'].append(nhits)
@@ -75,7 +74,7 @@ def plotnhits(nhits):
 
 def plotLL(data):
     plt.figure(figsize=(10, 7), dpi=100)
-    bins = np.arange(-0.02, 0.08, 0.001)
+    bins = np.arange(-0.02, 0.03, 0.001)
     for particle in data:
         scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
         plt.hist(x = scaled_LLdiff, bins = bins, alpha=0.5, rwidth=0.85, label = particle)
@@ -118,7 +117,7 @@ def plotLLvsEnergy(data):
     plt.ylabel('log-Likelyhood difference divided by nhit')
     plt.title('1 MeV Likelyhood o-Ps vs e+ For Different Energies')
     plt.legend(loc='best')
-    plt.xlim([-1, 5])
+    #plt.xlim([-1, 5])
     #plt.ylim([-0.14, 0.065])
     if show:
         plt.show()
