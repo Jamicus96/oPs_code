@@ -88,7 +88,7 @@ def plotLLvsDelay(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
         scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
-        plt.scatter(data[particle]['delays'], scaled_LLdiff, label=particle)
+        plt.scatter(data[particle]['delays'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('decay time (ns)')
@@ -107,7 +107,7 @@ def plotLLvsEnergy(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
         scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
-        plt.scatter(data[particle]['energies'], scaled_LLdiff, label=particle)
+        plt.scatter(data[particle]['energies'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Reconstructed Event Energy (MeV)')
@@ -126,7 +126,7 @@ def plotLLvsNhit(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
         scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
-        plt.scatter(data[particle]['nhits'], scaled_LLdiff, label=particle)
+        plt.scatter(data[particle]['nhits'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
@@ -144,7 +144,7 @@ def plotLLvsNhit(data, energy_lim):
 def plotEnergyvsNhit(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        plt.scatter(data[particle]['nhits'], data[particle]['energies'], label=particle)
+        plt.scatter(data[particle]['nhits'], data[particle]['energies'], alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
@@ -162,7 +162,7 @@ def plotEnergyvsNhit(data, energy_lim):
 def plotDelayvsEnergy(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        plt.scatter(data[particle]['energies'], data[particle]['delays'], label=particle)
+        plt.scatter(data[particle]['energies'], data[particle]['delays'], alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Reconstructed Event Energy (MeV)')
@@ -180,7 +180,7 @@ def plotDelayvsEnergy(data, energy_lim):
 def plotDelayvsNhit(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        plt.scatter(data[particle]['nhits'], data[particle]['delays'], label=particle)
+        plt.scatter(data[particle]['nhits'], data[particle]['delays'], alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
