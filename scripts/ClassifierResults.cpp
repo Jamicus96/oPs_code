@@ -40,7 +40,7 @@
 #include <fstream>
 
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::vector<std::string>& filenames, const std::string& out_file_address, double vol_cut, bool is_oPs, bool make_hists, bool verbose);
-void printResults(const std::string& output_filename, const std::vector<double>& delays, const std::vector<double>& classier_results, const std::vector<double>& nhits_vec, const std::vector<double>& energies);
+void printResults(const std::string& output_filename, const std::vector<double>& delays, const std::vector<double>& oPs_classier_results, const std::vector<double>& alphaNreactor_classier_results, const std::vector<double>& nhits_vec, const std::vector<double>& energies);
 
 int main(int argc, char** argv) {
     std::string output_file = argv[1];
@@ -56,20 +56,21 @@ int main(int argc, char** argv) {
     // Get e+ delays
     std::vector<std::vector<double> > results = findPositronDelays_andClassification(input_files, output_file, 5700, is_oPs, make_hists, verbose);
     const std::vector<double> delays = results.at(0);
-    const std::vector<double> classier_results = results.at(1);
-    const std::vector<double> nhits_vec = results.at(2);
-    const std::vector<double> energies = results.at(3);
+    const std::vector<double> oPs_classier_results = results.at(1);
+    const std::vector<double> alphaNreactor_classier_results = results.at(2);
+    const std::vector<double> nhits_vec = results.at(3);
+    const std::vector<double> energies = results.at(4);
 
     // Get o-Ps pdf and print to file
     if (verbose) {std::cout << "Printing results to file..." << std::endl;}
-    printResults(output_file, delays, classier_results, nhits_vec, energies);
+    printResults(output_file, delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies);
 
     return 0;
 }
 
 
 /**
- * @brief Returns a list of the delays imparted to positron decays (emulating oPs)
+ * @brief Returns a list of the delays imparted to positron decays (emulating oPs), classifications, nhits and recon energies.
  * 
  * @param filenames List of simulation filenames to analyse .
  * @param out_file_address Text filename to write results to. 
@@ -77,7 +78,7 @@ int main(int argc, char** argv) {
  * @param is_oPs 
  * @param make_hists 
  * @param verbose 
- * @return std::vector<double> 
+ * @return std::vector<double> = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies}
  */
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::vector<std::string>& filenames, const std::string& out_file_address, double vol_cut, bool is_oPs, bool make_hists, bool verbose) {
     if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
@@ -106,8 +107,10 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     std::vector<double> delays;
     double energy;
     std::vector<double> energies;
-    double classier_result = 0.0;
-    std::vector<double> classier_results;
+    double oPs_classier_result = 0.0;
+    std::vector<double> oPs_classier_results;
+    double alphaNreactor_classier_result = 0.0;
+    std::vector<double> alphaNreactor_classier_results;
     double nhits = 0.0;
     std::vector<double> nhits_vec;
 
@@ -153,11 +156,16 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                     continue;
                 }
 
-                // Get classifier result
-                RAT::DS::ClassifierResult cResult = rEV.GetClassifierResult("PositroniumClassifier");
-                classier_result = cResult.GetClassification("PositroniumClassifier");
+                // Get classifier results
+                RAT::DS::ClassifierResult oPs_result = rEV.GetClassifierResult("PositroniumClassifier");
+                oPs_classier_result = oPs_result.GetClassification("PositroniumClassifier");
+                if (verbose) {std::cout << "POSITRONIUM classifier result (for next particle) = " << oPs_classier_result << std::endl;}
+
+                RAT::DS::ClassifierResult alphaNreactor_result = rEV.GetClassifierResult("AlphaNReactorIBDClassifier");
+                alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
+                if (verbose) {std::cout << "alphaNreactor classifier result (for next particle) = " << alphaNreactor_classier_result << std::endl;}
+
                 nhits = rEV.GetNhitsCleaned();
-                if (verbose) {std::cout << "Classifier result (for next particle) = " << classier_result << std::endl;}
 
                 // Should only go through this loop once in MC.
                 if (verbose) {std::cout << "Getting track history..." << std::endl;}
@@ -192,7 +200,8 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 if (!is_oPs || delay != 0.0) {
                     if (verbose) {std::cout << "Writing info..." << std::endl;}
                     delays.push_back(delay);
-                    classier_results.push_back(classier_result);
+                    oPs_classier_results.push_back(oPs_classier_result);
+                    alphaNreactor_classier_results.push_back(alphaNreactor_classier_result);
                     nhits_vec.push_back(nhits);
                     energies.push_back(energy);
 
@@ -205,7 +214,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                         // for each individual event
                         std::string hist_name = "hHitTimeResidualsMC_" + std::to_string(num_evts);
                         std::string title = "Hit time residuals using the MC position, o-Ps delay = " + std::to_string(delay)
-                                            + " ns, E = " + std::to_string(energy) + " MeV, Classifier result = " + std::to_string(classier_result);
+                                            + " ns, E = " + std::to_string(energy) + " MeV, Classifier result = " + std::to_string(oPs_classier_result);
                         TH1D* evt_hist = new TH1D(hist_name.c_str(), title.c_str(), 1000, -10.0, 500.0);
 
                         const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
@@ -240,24 +249,26 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     }
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
-    if (verbose) {std::cout << "Num classifier results: " << classier_results.size() << std::endl;}
-    std::vector<std::vector<double> > results = {delays, classier_results, nhits_vec, energies};
+    if (verbose) {std::cout << "Num oPs_classifier results: " << oPs_classier_results.size() << std::endl;}
+    std::vector<std::vector<double> > results = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies};
     return results;
 }
 
 
 /**
  * @brief Print pdf to text file based on inputted histogram.
+ * Each line is:
+ * oPs_classifier_result alphaNreactor_classifier_result delay nhits energy
  * 
  * @param output_filename 
  * @param hist 
  */
-void printResults(const std::string& output_filename, const std::vector<double>& delays, const std::vector<double>& classier_results, const std::vector<double>& nhits_vec, const std::vector<double>& energies) {
+void printResults(const std::string& output_filename, const std::vector<double>& delays, const std::vector<double>& oPs_classier_results, const std::vector<double>& alphaNreactor_classier_results, const std::vector<double>& nhits_vec, const std::vector<double>& energies) {
 
     // Check results make sense
-    if (!(delays.size() == classier_results.size() && delays.size() == nhits_vec.size() && delays.size() == energies.size())) {
+    if (!(delays.size() == oPs_classier_results.size() && delays.size() == alphaNreactor_classier_results.size() && delays.size() == nhits_vec.size() && delays.size() == energies.size())) {
         std::cout << "ERROR: number of elements not equal:" << std::endl;
-        std::cout << "delays: " << delays.size() << ", classier_results: " << classier_results.size() << ", nhits_vec: " << nhits_vec.size() << ", energies: " << energies.size() << std::endl;
+        std::cout << "delays: " << delays.size() << ", oPs_classier_results: " << oPs_classier_results.size() << ", alphaNreactor_classier_results: " << alphaNreactor_classier_results.size() << ", nhits_vec: " << nhits_vec.size() << ", energies: " << energies.size() << std::endl;
         exit(1);
     }
 
@@ -265,7 +276,7 @@ void printResults(const std::string& output_filename, const std::vector<double>&
     std::ofstream datafile;
     datafile.open(output_filename, std::ofstream::out | std::ofstream::trunc);
     for (unsigned int i = 0; i < delays.size(); ++i) {
-        datafile << classier_results.at(i) << " " << delays.at(i) << " " << nhits_vec.at(i) << " " << energies.at(i) << std::endl;
+        datafile << oPs_classier_results.at(i) << " " << alphaNreactor_classier_results.at(i) << " " << delays.at(i) << " " << nhits_vec.at(i) << " " << energies.at(i) << std::endl;
     }
 
     datafile.close();
