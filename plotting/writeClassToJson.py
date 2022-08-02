@@ -52,16 +52,18 @@ def writeToJson(json_repo, info):
         if particle not in table:
             table[particle] = {}
         table[particle][particle_energy]= {}
-        table[particle][particle_energy]['Classifier_results'] = []
+        table[particle][particle_energy]['oPs_lassifier_results'] = []
+        table[particle][particle_energy]['alphaNreactor_lassifier_results'] = []
         table[particle][particle_energy]['delays'] = []
         table[particle][particle_energy]['nhits'] = []
         table[particle][particle_energy]['recon_event_energies'] = []
         for line in lines:
             stats = line.split(' ')
-            table[particle][particle_energy]['Classifier_results'].append(float(stats[0]))
-            table[particle][particle_energy]['delays'].append(float(stats[1]))
-            table[particle][particle_energy]['nhits'].append(float(stats[2]))
-            table[particle][particle_energy]['recon_event_energies'].append(float(stats[3]))
+            table[particle][particle_energy]['oPs_lassifier_results'].append(float(stats[0]))
+            table[particle][particle_energy]['alphaNreactor_lassifier_results'].append(float(stats[1]))
+            table[particle][particle_energy]['delays'].append(float(stats[2]))
+            table[particle][particle_energy]['nhits'].append(float(stats[3]))
+            table[particle][particle_energy]['recon_event_energies'].append(float(stats[4]))
 
     with open(json_repo + 'Classifier_stats.json', 'w') as f:
         json.dump(table, f)
