@@ -51,6 +51,25 @@ def applyCuts(data, energy_lim):
 
 ############ Plotting Funcs #############
 
+def plotLLvsEnergy(data, energy_lim):
+    plt.figure(figsize=(10, 7), dpi=100)
+    for particle in data:
+        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        plt.scatter(data[particle]['energies'], scaled_LLdiff, alpha=0.5, label=particle)
+    #plt.xscale('log')
+    #plt.yscale('log')
+    plt.xlabel('Reconstructed Event Energy (MeV)')
+    plt.ylabel('log-Likelyhood difference divided by nhit')
+    plt.title('Likelyhood o-Ps vs e+ For Different Energies, for reconstructed energy in ' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + 'MeV')
+    plt.legend(loc='best')
+    #plt.xlim([-1, 5])
+    #plt.ylim([-0.14, 0.065])
+    if show:
+        plt.show()
+    else:
+        plt.savefig(save_fig_repo + 'o-Ps_LLdiff_energies_' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + '.png', dpi=1000)
+        plt.close()
+
 def plotnhits(nhits, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     bins = 10**(np.linspace(0, 4, 200))

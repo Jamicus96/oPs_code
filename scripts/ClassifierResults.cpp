@@ -23,6 +23,7 @@
 #include <RAT/DS/EV.hh>
 #include <RAT/DS/PMT.hh>
 #include <RAT/DS/FitResult.hh>
+#include <RAT/DS/FitClassifierCollection.hh>
 
 #include <RAT/TrackNav.hh>
 #include <RAT/TrackCursor.hh>
@@ -118,7 +119,6 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
         RAT::DU::DSReader dsReader(filenames.at(i));
         // Loop through events. Each one should have one primary track (first child) in MC
         if (verbose) {std::cout << "Looping through events..." << std::endl;}
-
         for (size_t iEv = 0; iEv < dsReader.GetEntryCount(); iEv++) {
             const RAT::DS::Entry& rDS = dsReader.GetEntry(iEv);
             RAT::TrackNav nav(&rDS);
@@ -157,13 +157,42 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 }
 
                 // Get classifier results
-                RAT::DS::ClassifierResult oPs_result = rEV.GetClassifierResult("PositroniumClassifier");
-                oPs_classier_result = oPs_result.GetClassification("PositroniumClassifier");
-                if (verbose) {std::cout << "POSITRONIUM classifier result (for next particle) = " << oPs_classier_result << std::endl;}
+                try{
+                    if (!rEV.ClassifierResultExists("PositroniumClassifier")) {
+                        std::cout << "No PositroniumClassifier results for entry " << iEv << std::endl;
+                        continue;
+                    }
+                    if (!rEV.GetClassifierResult("PositroniumClassifier").GetValid()) {
+                        std::cout << "No valid PositroniumClassifier result for entry " << iEv << std::endl;
+                        continue;
+                    }
+                    RAT::DS::ClassifierResult oPs_result = rEV.GetClassifierResult("PositroniumClassifier");
+                    oPs_classier_result = oPs_result.GetClassification("PositroniumClassifier");
+                    if (verbose) {std::cout << "POSITRONIUM classifier result (for next particle) = " << oPs_classier_result << std::endl;}
+                } catch (RAT::DS::ClassifierResult::NoClassificationError&) {
+                    std::cout << "Error in PositroniumClassifier" << std::endl;
+                    continue;
+                }
 
-                RAT::DS::ClassifierResult alphaNreactor_result = rEV.GetClassifierResult("AlphaNReactorIBDClassifier");
-                alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
-                if (verbose) {std::cout << "alphaNreactor classifier result (for next particle) = " << alphaNreactor_classier_result << std::endl;}
+                try {
+                    //RAT::DS::FitClassifierCollection<RAT::DS::FitResult> fitResult = rEV.GetFitResults(0);
+                    //RAT::DS::ClassifierResult alphaNreactor_result = fitResult.GetResult("AlphaNReactorIBDClassifier");
+
+                    if (!rEV.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
+                        std::cout << "No AlphaNReactorIBDClassifier results for entry " << iEv << std::endl;
+                        continue;
+                    }
+                    if (!rEV.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
+                        std::cout << "No valid AlphaNReactorIBDClassifier result for entry " << iEv << std::endl;
+                        continue;
+                    }
+                    RAT::DS::ClassifierResult alphaNreactor_result = rEV.GetClassifierResult("AlphaNReactorIBDClassifier");
+                    alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
+                    if (verbose) {std::cout << "alphaNreactor classifier result (for next particle) = " << alphaNreactor_classier_result << std::endl;}
+                } catch (RAT::DS::ClassifierResult::NoClassificationError&) {
+                    std::cout << "Error in AlphaNReactorIBDClassifier" << std::endl;
+                    continue;
+                }
 
                 nhits = rEV.GetNhitsCleaned();
 
@@ -237,7 +266,8 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 }
             }
         } //event
-        dsReader.Delete();
+        //dsReader.Delete();
+        dsReader.~DSReader();
     }
 
     if (make_hists) {
