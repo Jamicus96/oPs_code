@@ -12,9 +12,9 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--class_repo', '-pr', type=str, dest='class_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/Classifications/', help='Folder to save Classifier result text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/Classifications/', help='Folder to save Classifier result text files in.')
     parser.add_argument('--json_repo', '-jsr', type=str, dest='json_repo',
-                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/',
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/results/Classifications/spectra/',
                         help='Folder to json file with final stats in.')
 
     args = parser.parse_args()
@@ -52,18 +52,24 @@ def writeToJson(json_repo, info):
         if particle not in table:
             table[particle] = {}
         table[particle][particle_energy]= {}
+        table[particle][particle_energy]['delays'] = []
         table[particle][particle_energy]['oPs_lassifier_results'] = []
         table[particle][particle_energy]['alphaNreactor_lassifier_results'] = []
-        table[particle][particle_energy]['delays'] = []
         table[particle][particle_energy]['nhits'] = []
         table[particle][particle_energy]['recon_event_energies'] = []
+        table[particle][particle_energy]['radius'] = []
+        table[particle][particle_energy]['delta_times'] = []
+        table[particle][particle_energy]['entry_num'] = []
         for line in lines:
             stats = line.split(' ')
-            table[particle][particle_energy]['oPs_lassifier_results'].append(float(stats[0]))
-            table[particle][particle_energy]['alphaNreactor_lassifier_results'].append(float(stats[1]))
-            table[particle][particle_energy]['delays'].append(float(stats[2]))
+            table[particle][particle_energy]['delays'].append(float(stats[0]))
+            table[particle][particle_energy]['oPs_lassifier_results'].append(float(stats[1]))
+            table[particle][particle_energy]['alphaNreactor_lassifier_results'].append(float(stats[2]))
             table[particle][particle_energy]['nhits'].append(float(stats[3]))
             table[particle][particle_energy]['recon_event_energies'].append(float(stats[4]))
+            table[particle][particle_energy]['radius'].append(float(stats[5]))
+            table[particle][particle_energy]['delta_times'].append(float(stats[6]))
+            table[particle][particle_energy]['entry_num'].append(float(stats[7]))
 
     with open(json_repo + 'Classifier_stats.json', 'w') as f:
         json.dump(table, f)

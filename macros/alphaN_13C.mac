@@ -1,20 +1,19 @@
-# Omit irrelavent processes to speed up the simulation
-/rat/physics_list/OmitMuonicProcesses true
-/rat/physics_list/OmitHadronicProcesses true
-
 # Set the detector geometry and noise rate database entries used in the simulation
 /rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
 /rat/db/set GEO[inner_av] material "labppo_1p1_berkeley_scintillator"
-
-# Set o-Ps values
-/rat/db/set POSITRONIUM formfrac 0.36
 
 # store tracking info except certain particles
 /rat/tracking/store full
 /rat/tracking/omit opticalphoton
 /rat/tracking/omit e-
 
-# Begin Event loop and the processors to be run on each event
+#MC cutoff parameters
+/rat/db/set MC event_cutoff_time 1e9
+/rat/db/set MC event_cutoff_nstep 1000
+
+
+# BEGIN EVENT LOOP
+
 /run/initialize
 /rat/proc frontend
 /rat/proc trigger
@@ -27,22 +26,30 @@
 # Run fitter
 /rat/proc scintFitter
 
-# Run new Positronium classifier (results can be accessed when analysing output root file)
+# Run classifiers
 /rat/proc classifier
 /rat/procset classifier "PositroniumClassifier"
 /rat/procset seed "scintFitter"
 /rat/procset name "PositroniumClassifier"
 
-/rat/proc outroot
+/rat/proc classifier
+/rat/procset classifier "AlphaNReactorIBDClassifier"
+/rat/procset seed "scintFitter"
+/rat/procset name "AlphaNReactorIBDClassifier"
+
+/rat/proclast outroot
 /rat/procset file "oPs_output.root"
 
-# Now specify the events to generate and pass to the event loop
-/generator/add combo gun2:fill:poisson
-#/generator/vtx/set pname px py pz angle E1 E2 [polx poly polz]
-/generator/vtx/set e+ 0 0 0 0 0.5 9.0
-/generator/pos/set 0.0 0.0 0.0
+# END EVENT LOOP
+
+
+/generator/add combo alpha_n:fill:uniform
+# The generator can be set to produce a different neutron spectrum
+# depending on whether the vertex is set to LAB, TeLAB or AV
+# The second argument sets whether the alpha has been absorbed by 13C or 18O
+/generator/vtx/set LAB 13C
+/generator/pos/set inner_av
 /generator/rate/set 1
 
-# start the simulation with 100 events
 /rat/run/start 1000
 exit

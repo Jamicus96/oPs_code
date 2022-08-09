@@ -41,7 +41,7 @@
 #include <fstream>
 
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::vector<std::string>& filenames, const std::string& out_file_address, double vol_cut, bool is_oPs, bool make_hists, bool verbose);
-void printResults(const std::string& output_filename, const std::vector<double>& delays, const std::vector<double>& oPs_classier_results, const std::vector<double>& alphaNreactor_classier_results, const std::vector<double>& nhits_vec, const std::vector<double>& energies);
+void printResults(const std::string& output_filename, const std::vector<std::vector<double> >& results);
 
 int main(int argc, char** argv) {
     std::string output_file = argv[1];
@@ -56,15 +56,10 @@ int main(int argc, char** argv) {
 
     // Get e+ delays
     std::vector<std::vector<double> > results = findPositronDelays_andClassification(input_files, output_file, 5700, is_oPs, make_hists, verbose);
-    const std::vector<double> delays = results.at(0);
-    const std::vector<double> oPs_classier_results = results.at(1);
-    const std::vector<double> alphaNreactor_classier_results = results.at(2);
-    const std::vector<double> nhits_vec = results.at(3);
-    const std::vector<double> energies = results.at(4);
-
+    
     // Get o-Ps pdf and print to file
     if (verbose) {std::cout << "Printing results to file..." << std::endl;}
-    printResults(output_file, delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies);
+    printResults(output_file, results);
 
     return 0;
 }
@@ -79,7 +74,7 @@ int main(int argc, char** argv) {
  * @param is_oPs 
  * @param make_hists 
  * @param verbose 
- * @return std::vector<double> = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies}
+ * @return std::vector<double> = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies, positions, delta_times, entry_nums};
  */
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::vector<std::string>& filenames, const std::string& out_file_address, double vol_cut, bool is_oPs, bool make_hists, bool verbose) {
     if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
@@ -104,135 +99,148 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     double mean_delay = 0.0;
     unsigned int num_evts = 0;
 
-    double delay = 0.0;
+    double delay;
     std::vector<double> delays;
-    double energy;
-    std::vector<double> energies;
-    double oPs_classier_result = 0.0;
+    double oPs_classier_result;
     std::vector<double> oPs_classier_results;
-    double alphaNreactor_classier_result = 0.0;
+    double alphaNreactor_classier_result;
     std::vector<double> alphaNreactor_classier_results;
     double nhits = 0.0;
     std::vector<double> nhits_vec;
-
+    double energy;
+    std::vector<double> energies;
+    double posRad;
+    std::vector<double> positions;
+    double delta_time;
+    std::vector<double> delta_times;
+    std::vector<double> entry_nums;
+    
+    ULong64_t prev_time = 0.0;
     for (unsigned int i = 0; i < filenames.size(); ++i) {
+        if (verbose) {std::cout << "Reading in file: " << filenames.at(i) << std::endl;}
         RAT::DU::DSReader dsReader(filenames.at(i));
         // Loop through events. Each one should have one primary track (first child) in MC
         if (verbose) {std::cout << "Looping through events..." << std::endl;}
-        for (size_t iEv = 0; iEv < dsReader.GetEntryCount(); iEv++) {
-            const RAT::DS::Entry& rDS = dsReader.GetEntry(iEv);
+        for (size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); iEntry++) {
+            const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
             RAT::TrackNav nav(&rDS);
             RAT::TrackCursor cursor = nav.Cursor(false);
 
             // Check there is an event in this entry (won't get associated t_res plot if not)
-                if (rDS.GetEVCount() > 0) {
-                const RAT::DS::EV& rEV = rDS.GetEV(0);
+            if (rDS.GetEVCount() > 0) {
+                for (unsigned int iEv = 0; iEv < rDS.GetEVCount(); ++iEv) {
+                    const RAT::DS::EV& rEV = rDS.GetEV(iEv);
 
-                double posRad = 0.0;
-                double energy = -1.0;
-                try {
-                    const RAT::DS::FitVertex& rVertex = rEV.GetFitResult(rEV.GetDefaultFitName()).GetVertex(0);
-                    if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {continue;} // fit invalid
-                    posRad = rVertex.GetPosition().Mag();
-                    energy = rVertex.GetEnergy();
-                }
-                catch (const RAT::DS::FitCollection::NoResultError&) {
-                    // no fit result by the name of fitName
-                    continue;
-                }
-                catch (const RAT::DS::FitResult::NoVertexError&) {
-                    // no fit vertex
-                    continue;
-                }
-                catch (const RAT::DS::FitVertex::NoValueError&) {
-                    // position or time missing
-                    continue;
-                }
-                // DataNotFound --> implies no fit results are present, don't catch.
-
-                // Apply volume cut
-                if (posRad > vol_cut) {
-                    if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
-                    continue;
-                }
-
-                // Get classifier results
-                try{
-                    if (!rEV.ClassifierResultExists("PositroniumClassifier")) {
-                        std::cout << "No PositroniumClassifier results for entry " << iEv << std::endl;
+                    posRad = 0.0;
+                    energy = -1.0;
+                    try {
+                        const RAT::DS::FitVertex& rVertex = rEV.GetFitResult(rEV.GetDefaultFitName()).GetVertex(0);
+                        if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {continue;} // fit invalid
+                        posRad = rVertex.GetPosition().Mag();
+                        energy = rVertex.GetEnergy();
+                    }
+                    catch (const RAT::DS::FitCollection::NoResultError&) {
+                        // no fit result by the name of fitName
                         continue;
                     }
-                    if (!rEV.GetClassifierResult("PositroniumClassifier").GetValid()) {
-                        std::cout << "No valid PositroniumClassifier result for entry " << iEv << std::endl;
+                    catch (const RAT::DS::FitResult::NoVertexError&) {
+                        // no fit vertex
                         continue;
                     }
-                    RAT::DS::ClassifierResult oPs_result = rEV.GetClassifierResult("PositroniumClassifier");
-                    oPs_classier_result = oPs_result.GetClassification("PositroniumClassifier");
-                    if (verbose) {std::cout << "POSITRONIUM classifier result (for next particle) = " << oPs_classier_result << std::endl;}
-                } catch (RAT::DS::ClassifierResult::NoClassificationError&) {
-                    std::cout << "Error in PositroniumClassifier" << std::endl;
-                    continue;
-                }
-
-                try {
-                    //RAT::DS::FitClassifierCollection<RAT::DS::FitResult> fitResult = rEV.GetFitResults(0);
-                    //RAT::DS::ClassifierResult alphaNreactor_result = fitResult.GetResult("AlphaNReactorIBDClassifier");
-
-                    if (!rEV.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
-                        std::cout << "No AlphaNReactorIBDClassifier results for entry " << iEv << std::endl;
+                    catch (const RAT::DS::FitVertex::NoValueError&) {
+                        // position or time missing
                         continue;
                     }
-                    if (!rEV.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
-                        std::cout << "No valid AlphaNReactorIBDClassifier result for entry " << iEv << std::endl;
+                    // DataNotFound --> implies no fit results are present, don't catch.
+
+                    // Apply volume cut
+                    // if (posRad > vol_cut) {
+                    //     if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
+                    //     continue;
+                    // }
+
+                    // Get classifier results
+                    try {
+                        if (!rEV.ClassifierResultExists("PositroniumClassifier")) {
+                            std::cout << "No PositroniumClassifier results for entry " << iEntry << ", event " << iEv << std::endl;
+                            continue;
+                        }
+                        if (!rEV.GetClassifierResult("PositroniumClassifier").GetValid()) {
+                            std::cout << "No valid PositroniumClassifier result for entry " << iEntry << ", event " << iEv << std::endl;
+                            continue;
+                        }
+                        RAT::DS::ClassifierResult oPs_result = rEV.GetClassifierResult("PositroniumClassifier");
+                        oPs_classier_result = oPs_result.GetClassification("PositroniumClassifier");
+                        if (verbose) {std::cout << "POSITRONIUM classifier result (for next particle) = " << oPs_classier_result << std::endl;}
+                    } catch (RAT::DS::ClassifierResult::NoClassificationError&) {
+                        std::cout << "Error in PositroniumClassifier" << std::endl;
                         continue;
                     }
-                    RAT::DS::ClassifierResult alphaNreactor_result = rEV.GetClassifierResult("AlphaNReactorIBDClassifier");
-                    alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
-                    if (verbose) {std::cout << "alphaNreactor classifier result (for next particle) = " << alphaNreactor_classier_result << std::endl;}
-                } catch (RAT::DS::ClassifierResult::NoClassificationError&) {
-                    std::cout << "Error in AlphaNReactorIBDClassifier" << std::endl;
-                    continue;
-                }
 
-                nhits = rEV.GetNhitsCleaned();
+                    try {
+                        //RAT::DS::FitClassifierCollection<RAT::DS::FitResult> fitResult = rEV.GetFitResults(0);
+                        //RAT::DS::ClassifierResult alphaNreactor_result = fitResult.GetResult("AlphaNReactorIBDClassifier");
 
-                // Should only go through this loop once in MC.
-                if (verbose) {std::cout << "Getting track history..." << std::endl;}
-                //for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
-                    //cursor.GoChild(iCh);
-                    cursor.GoChild(0);
+                        if (!rEV.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
+                            std::cout << "No AlphaNReactorIBDClassifier results for entry " << iEntry << std::endl;
+                            continue;
+                        }
+                        if (!rEV.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
+                            std::cout << "No valid AlphaNReactorIBDClassifier result for entry " << iEntry << std::endl;
+                            continue;
+                        }
+                        RAT::DS::ClassifierResult alphaNreactor_result = rEV.GetClassifierResult("AlphaNReactorIBDClassifier");
+                        alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
+                        if (verbose) {std::cout << "alphaNreactor classifier result (for next particle) = " << alphaNreactor_classier_result << std::endl;}
+                    } catch (RAT::DS::ClassifierResult::NoClassificationError&) {
+                        std::cout << "Error in AlphaNReactorIBDClassifier" << std::endl;
+                        continue;
+                    }
 
-                    // Go to the end of the e+ track
-                    cursor.GoTrackEnd();
-                    RAT::TrackNode* parent_node = cursor.Here();
-                    double start_time = parent_node->GetGlobalTime();
-                    if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
-                    if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
+                    // Should only go through this loop once in MC.
+                    if (verbose) {std::cout << "Getting track history..." << std::endl;}
+                    //for (size_t iCh = 0; iCh<(size_t)cursor.ChildCount(); iCh++) {
+                        //cursor.GoChild(iCh);
+                        cursor.GoChild(0);
 
-                    // Go to the start of the first child track (gamma)
-                    cursor.GoChild(0);
-                    RAT::TrackNode* child_node = cursor.Here();
-                    double end_time = child_node->GetGlobalTime();
-                    delay = end_time - start_time;
-                    if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
-                    if (verbose) {std::cout << "e+ delay: " << delay << std::endl;}
+                        // Go to the end of the e+ track
+                        cursor.GoTrackEnd();
+                        RAT::TrackNode* parent_node = cursor.Here();
+                        double start_time = parent_node->GetGlobalTime();
+                        if (verbose) {std::cout << "Parent particle: " << parent_node->GetParticleName() << std::endl;}
+                        if (verbose) {std::cout << "Last step process: " << parent_node->GetProcess() << std::endl;}
 
-                    // Go back to e+ track
-                    cursor.GoParent();
+                        // Go to the start of the first child track (gamma)
+                        cursor.GoChild(0);
+                        RAT::TrackNode* child_node = cursor.Here();
+                        double end_time = child_node->GetGlobalTime();
+                        delay = end_time - start_time;
+                        if (verbose) {std::cout << "Child particle: " << child_node->GetParticleName() << std::endl;}
+                        if (verbose) {std::cout << "e+ delay: " << delay << std::endl;}
 
-                    // Go back to parent node to redo loop
-                    cursor.GoTrackStart();
-                    cursor.GoParent();
-                //} //Primary Particle Tracks
+                        // Go back to e+ track
+                        cursor.GoParent();
 
-                // Make sure that if it's only o-Ps sims to leave out the few bugged events with no delay
-                if (!is_oPs || delay != 0.0) {
+                        // Go back to parent node to redo loop
+                        cursor.GoTrackStart();
+                        cursor.GoParent();
+                    //} //Primary Particle Tracks
+
+                    nhits = rEV.GetNhitsCleaned();
+                    delta_time = (rEV.GetClockCount50() - prev_time) * 20.0;  // nanoseconds
+                    prev_time = rEV.GetClockCount50();
+                    //time = rEV.GetUniversalTime().GetNanoSeconds();
+
+                    // Make sure that if it's only o-Ps sims to leave out the few bugged events with no delay
                     if (verbose) {std::cout << "Writing info..." << std::endl;}
                     delays.push_back(delay);
                     oPs_classier_results.push_back(oPs_classier_result);
                     alphaNreactor_classier_results.push_back(alphaNreactor_classier_result);
                     nhits_vec.push_back(nhits);
                     energies.push_back(energy);
+                    positions.push_back(posRad);
+                    delta_times.push_back(delta_time);
+                    entry_nums.push_back(iEntry);
 
                     /* ~~~~~~ Make time residual hist to check results make sense ~~~~~ */
                     if (make_hists) {
@@ -267,7 +275,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
             }
         } //event
         //dsReader.Delete();
-        dsReader.~DSReader();
+        //dsReader.~DSReader();
     }
 
     if (make_hists) {
@@ -280,7 +288,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
     if (verbose) {std::cout << "Num oPs_classifier results: " << oPs_classier_results.size() << std::endl;}
-    std::vector<std::vector<double> > results = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies};
+    std::vector<std::vector<double> > results = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies, positions, delta_times, entry_nums};
     return results;
 }
 
@@ -293,20 +301,24 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
  * @param output_filename 
  * @param hist 
  */
-void printResults(const std::string& output_filename, const std::vector<double>& delays, const std::vector<double>& oPs_classier_results, const std::vector<double>& alphaNreactor_classier_results, const std::vector<double>& nhits_vec, const std::vector<double>& energies) {
-
+void printResults(const std::string& output_filename, const std::vector<std::vector<double> >& results) {
     // Check results make sense
-    if (!(delays.size() == oPs_classier_results.size() && delays.size() == alphaNreactor_classier_results.size() && delays.size() == nhits_vec.size() && delays.size() == energies.size())) {
-        std::cout << "ERROR: number of elements not equal:" << std::endl;
-        std::cout << "delays: " << delays.size() << ", oPs_classier_results: " << oPs_classier_results.size() << ", alphaNreactor_classier_results: " << alphaNreactor_classier_results.size() << ", nhits_vec: " << nhits_vec.size() << ", energies: " << energies.size() << std::endl;
-        exit(1);
+    for (unsigned int n = 1; n < results.size(); ++n) {
+        if (results.at(0).size() != results.at(n).size()) {
+            std::cout << "ERROR: number of elements not equal:" << std::endl;
+            std::cout << "results.at(0).size() = " << results.at(0).size() << ", results.at(" << n << ").size() = " << results.at(n).size() << std::endl;
+            exit(1);
+        }
     }
 
     // Open file and print results
     std::ofstream datafile;
     datafile.open(output_filename, std::ofstream::out | std::ofstream::trunc);
-    for (unsigned int i = 0; i < delays.size(); ++i) {
-        datafile << oPs_classier_results.at(i) << " " << alphaNreactor_classier_results.at(i) << " " << delays.at(i) << " " << nhits_vec.at(i) << " " << energies.at(i) << std::endl;
+    for (unsigned int i = 0; i < results.at(0).size(); ++i) {
+        for (unsigned int j = 0; j < results.size() - 1; ++j) {
+            datafile << results.at(j).at(i) << " ";
+        }
+        datafile << results.at(results.size() - 1).at(i) << std::endl;
     }
 
     datafile.close();

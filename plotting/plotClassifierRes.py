@@ -54,12 +54,12 @@ def applyCuts(data, energy_lim):
 def plotLLvsEnergy(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        scaled_LLdiff = data[particle]['classifications']# / data[particle]['nhits']
         plt.scatter(data[particle]['energies'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Reconstructed Event Energy (MeV)')
-    plt.ylabel('log-Likelyhood difference divided by nhit')
+    plt.ylabel('log-Likelyhood difference')
     plt.title('Likelyhood o-Ps vs e+ For Different Energies, for reconstructed energy in ' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + 'MeV')
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
@@ -91,11 +91,11 @@ def plotLL(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     bins = np.arange(-0.02, 0.03, 0.0007)
     for particle in data:
-        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        scaled_LLdiff = data[particle]['classifications']# / data[particle]['nhits']
         plt.hist(x = scaled_LLdiff, bins = bins, alpha=0.5, rwidth=0.85, label = particle)
     plt.legend(loc='best')
     #plt.xlim([-50, 50])
-    plt.xlabel('log-Likelyhood difference divided by nhit')
+    plt.xlabel('log-Likelyhood difference')
     plt.title('LL difference, for reconstructed energy in ' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + 'MeV')
     if show:
         plt.show()
@@ -106,12 +106,12 @@ def plotLL(data, energy_lim):
 def plotLLvsDelay(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        scaled_LLdiff = data[particle]['classifications']# / data[particle]['nhits']
         plt.scatter(data[particle]['delays'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('decay time (ns)')
-    plt.ylabel('log-Likelyhood difference divided by nhit')
+    plt.ylabel('log-Likelyhood difference')
     plt.title('Likelyhood o-Ps vs e+ For Different Decay Times, for reconstructed energy in ' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + 'MeV')
     plt.legend(loc='best')
     #plt.xlim([-10, 100])
@@ -125,12 +125,12 @@ def plotLLvsDelay(data, energy_lim):
 def plotLLvsEnergy(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        scaled_LLdiff = data[particle]['classifications']# / data[particle]['nhits']
         plt.scatter(data[particle]['energies'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Reconstructed Event Energy (MeV)')
-    plt.ylabel('log-Likelyhood difference divided by nhit')
+    plt.ylabel('log-Likelyhood difference')
     plt.title('Likelyhood o-Ps vs e+ For Different Energies, for reconstructed energy in ' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + 'MeV')
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
@@ -144,12 +144,12 @@ def plotLLvsEnergy(data, energy_lim):
 def plotLLvsNhit(data, energy_lim):
     plt.figure(figsize=(10, 7), dpi=100)
     for particle in data:
-        scaled_LLdiff = data[particle]['classifications'] / data[particle]['nhits']
+        scaled_LLdiff = data[particle]['classifications']# / data[particle]['nhits']
         plt.scatter(data[particle]['nhits'], scaled_LLdiff, alpha=0.5, label=particle)
     #plt.xscale('log')
     #plt.yscale('log')
     plt.xlabel('Nhits')
-    plt.ylabel('log-Likelyhood difference divided by nhit')
+    plt.ylabel('log-Likelyhood difference')
     plt.title('Likelyhood o-Ps vs e+ For Different Energies, for reconstructed energy in ' + str(energy_lim[0]) + '-' + str(energy_lim[1]) + 'MeV')
     plt.legend(loc='best')
     #plt.xlim([-1, 5])
@@ -215,8 +215,8 @@ def plotDelayvsNhit(data, energy_lim):
         plt.close()
 
 def plotROC(data, energy_lim):
-    scaled_oPs_LLdiff = data['o-Ps']['classifications'] / data['o-Ps']['nhits']
-    scaled_elec_LLdiff = data['e-']['classifications'] / data['e-']['nhits']
+    scaled_oPs_LLdiff = data['o-Ps']['classifications']# / data['o-Ps']['nhits']
+    scaled_elec_LLdiff = data['e-']['classifications']# / data['e-']['nhits']
 
     N = 100
     logL_perNHit = np.linspace(-0.09, 0.05, N)
@@ -258,7 +258,7 @@ def main():
 
     # Upper energy limit
     #energy_lims = [(0.0, 2.5), (2.5, 4.0), (4.0, 5.5), (5.5, 7.0), (7.0, 8.5), (8.5, 10.0)]
-    energy_lims = [(0.0, 12.0)]
+    energy_lims = [(0.9, 10.0)]
     for energy_lim in energy_lims:
         cut_data, full_nhits = applyCuts(data, energy_lim)
 

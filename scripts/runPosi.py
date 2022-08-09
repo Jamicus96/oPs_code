@@ -12,20 +12,21 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--particle', '-p', type=str, dest='particle',
-                        default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma', 'alpha'], help='Which particle to simulate')
+                        default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma', 'alpha', 'IBD', 'alphaN13C', 'alphaN18O'],
+                        help='Which particle to simulate')
     parser.add_argument('--energies', '-e', type=str, dest='energies',
                         default='[0.5,9.0]', help='List of particle energy ranges to simulate (MeV).\n\
                         For example, input as [1.0,2.0;5.0,6.0] to get uniform random distributions of energies between\n\
                         1.0 and 2.0 MeV, and 5.0 and 6.0 MeV')
 
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/macros/', help='Folder to save Region-selected root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--pdf_repo', '-pr', type=str, dest='pdf_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/PDFs/', help='Folder to save PDF text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/PDFs/', help='Folder to save PDF text files in.')
     parser.add_argument('--class_repo', '-cr', type=str, dest='class_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/Classifications/', help='Folder to save Classifier result text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/Classifications/', help='Folder to save Classifier result text files in.')
 
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
@@ -106,7 +107,10 @@ def job_str_map(jobName_str, particle, energies):
             'e+': 'e+',
             'e-': 'e-',
             'gamma': 'gm',
-            'alpha': 'al'
+            'alpha': 'al',
+            'IBD': 'ib',
+            'alphaN13C': 'ac',
+            'alphaN18O': 'ao'
         }
     }
 
@@ -255,7 +259,14 @@ def runSims(args):
     # Read in example macro and job script + info
     repo_address = getRepoAddress()
 
-    example_macro_address = repo_address + 'macros/Sim_oPs.mac'
+    if args.particle == 'IBD':
+        example_macro_address = repo_address + 'macros/ReactorIBD.mac'
+    elif args.particle == 'alphaN13C':
+        example_macro_address = repo_address + 'macros/alphaN_13C.mac'
+    elif args.particle == 'alphaN18O':
+        example_macro_address = repo_address + 'macros/alphaN_18O.mac'
+    else:
+        example_macro_address = repo_address + 'macros/Sim_oPs.mac'
     with open(example_macro_address, "r") as f:
         example_macro = f.readlines()
 
@@ -418,18 +429,13 @@ def getClassification(args):
     print('Submitting job(s)...')
     for job_address in jobScript_addresses:
         # For higher energies, the jobs need more memory, otherwise they get killed
-        command = 'qsub -l m_mem_free=4G ' + job_address
+        command = 'qsub -l m_mem_free=32G ' + job_address
         if args.verbose:
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     return True
 
-### COMBINATIONS ###
-
-# def runSim_getPDF(args):
-#     result = runSims(args)
-#     return result and getPDF(args)
 
 ### MAIN ###
 
