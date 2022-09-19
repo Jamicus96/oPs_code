@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
  * @param is_oPs 
  * @param make_hists 
  * @param verbose 
- * @return std::vector<double> = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies, positions, delta_times, entry_nums};
+ * @return std::vector<double> = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies, positions_x, positions_y, positions_z, delta_times, entry_nums};
  */
 std::vector<std::vector<double> > findPositronDelays_andClassification(const std::vector<std::string>& filenames, const std::string& out_file_address, double vol_cut, bool is_oPs, bool make_hists, bool verbose) {
     if (verbose) {std::cout << "Finding e+ delays..." << std::endl;}
@@ -109,8 +109,9 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
     std::vector<double> nhits_vec;
     double energy;
     std::vector<double> energies;
-    double posRad;
-    std::vector<double> positions;
+    std::vector<double> positions_x;
+    std::vector<double> positions_y;
+    std::vector<double> positions_z;
     double delta_time;
     std::vector<double> delta_times;
     std::vector<double> entry_nums;
@@ -131,12 +132,12 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                 for (unsigned int iEv = 0; iEv < rDS.GetEVCount(); ++iEv) {
                     const RAT::DS::EV& rEV = rDS.GetEV(iEv);
 
-                    posRad = 0.0;
+                    TVector3 pos;
                     energy = -1.0;
                     try {
                         const RAT::DS::FitVertex& rVertex = rEV.GetFitResult(rEV.GetDefaultFitName()).GetVertex(0);
                         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {continue;} // fit invalid
-                        posRad = rVertex.GetPosition().Mag();
+                        pos = rVertex.GetPosition();
                         energy = rVertex.GetEnergy();
                     }
                     catch (const RAT::DS::FitCollection::NoResultError&) {
@@ -238,7 +239,9 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
                     alphaNreactor_classier_results.push_back(alphaNreactor_classier_result);
                     nhits_vec.push_back(nhits);
                     energies.push_back(energy);
-                    positions.push_back(posRad);
+                    positions_x.push_back(pos.X());
+                    positions_y.push_back(pos.Y());
+                    positions_z.push_back(pos.Z());
                     delta_times.push_back(delta_time);
                     entry_nums.push_back(iEntry);
 
@@ -288,7 +291,7 @@ std::vector<std::vector<double> > findPositronDelays_andClassification(const std
 
     if (verbose) {std::cout << "Num delays: " << delays.size() << std::endl;}
     if (verbose) {std::cout << "Num oPs_classifier results: " << oPs_classier_results.size() << std::endl;}
-    std::vector<std::vector<double> > results = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies, positions, delta_times, entry_nums};
+    std::vector<std::vector<double> > results = {delays, oPs_classier_results, alphaNreactor_classier_results, nhits_vec, energies, positions_x, positions_y, positions_z, delta_times, entry_nums};
     return results;
 }
 
