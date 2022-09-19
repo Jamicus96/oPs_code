@@ -57,7 +57,9 @@ def writeToJson(json_repo, info):
         table[particle][particle_energy]['alphaNreactor_lassifier_results'] = []
         table[particle][particle_energy]['nhits'] = []
         table[particle][particle_energy]['recon_event_energies'] = []
-        table[particle][particle_energy]['radius'] = []
+        table[particle][particle_energy]['x'] = []
+        table[particle][particle_energy]['y'] = []
+        table[particle][particle_energy]['z'] = []
         table[particle][particle_energy]['delta_times'] = []
         table[particle][particle_energy]['entry_num'] = []
         for line in lines:
@@ -67,9 +69,11 @@ def writeToJson(json_repo, info):
             table[particle][particle_energy]['alphaNreactor_lassifier_results'].append(float(stats[2]))
             table[particle][particle_energy]['nhits'].append(float(stats[3]))
             table[particle][particle_energy]['recon_event_energies'].append(float(stats[4]))
-            table[particle][particle_energy]['radius'].append(float(stats[5]))
-            table[particle][particle_energy]['delta_times'].append(float(stats[6]))
-            table[particle][particle_energy]['entry_num'].append(float(stats[7]))
+            table[particle][particle_energy]['x'].append(float(stats[5]))
+            table[particle][particle_energy]['y'].append(float(stats[6]))
+            table[particle][particle_energy]['z'].append(float(stats[7]))
+            table[particle][particle_energy]['delta_times'].append(float(stats[8]))
+            table[particle][particle_energy]['entry_num'].append(float(stats[9]))
 
     with open(json_repo + 'Classifier_stats.json', 'w') as f:
         json.dump(table, f)

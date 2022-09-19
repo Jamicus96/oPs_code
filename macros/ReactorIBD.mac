@@ -1,7 +1,3 @@
-# Omit irrelavent processes to speed up the simulation
-/rat/physics_list/OmitMuonicProcesses true
-/rat/physics_list/OmitHadronicProcesses true
-
 # Set the detector geometry and noise rate database entries used in the simulation
 /rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
 /rat/db/set GEO[inner_av] material "labppo_1p1_berkeley_scintillator"
