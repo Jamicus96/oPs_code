@@ -42,8 +42,7 @@
 
 std::vector<std::vector<double> > findPositronDelays(const std::vector<std::string>& filenames, bool verbose);
 void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hist);
-TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose);
-TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName = "");
+TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName = "");
 std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
 std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
 std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName = "");
@@ -68,8 +67,8 @@ int main(int argc, char** argv) {
 
     // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
-    TH1D* MC_summed_hist = HitTimeResidualsMCPosition(input_files, delays, cuts_name, verbose);
-    TH1D* Fitted_summed_hist = HitTimeResidualsFitPosition(input_files, delays, cuts_name, verbose);
+    TH1D* MC_summed_hist = HitTimeResiduals("true", input_files, delays, cuts_name, verbose);
+    TH1D* Fitted_summed_hist = HitTimeResiduals("recon", input_files, delays, cuts_name, verbose);
 
     // Get o-Ps pdf and print to file
     printPDF(output_file, MC_summed_hist, Fitted_summed_hist);
@@ -240,81 +239,27 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
 }
 
 /**
- * @brief Make hit time residual histogram using MC position and event time (summed over all events).
+ * @brief Make hit time residual histogram (summed over all events).
  * 
- * @param fileNames Simulation root file names.
- * @param delays Vector of o-Ps decay times.
- * @param vol_cut Volume cut, given by radius in mm.
- * @param is_oPs Are events we wish to look at only o-Ps events? If so, ignore delay=0 events (some get simulated anyway for some reason, so cut them out here).
+ * @param type = "true" (MC info), or "recon" (Fitted info).
+ * @param fileNames list of simulation output root files.
+ * @param delays vector with list of e+ decay times.
+ * @param cuts_name name of cuts method to be applied. Example "alphaN", if unknown cuts_name, defaults to all events pass cuts
  * @param verbose
+ * @param fitName
+ * @return TH1D*
  */
-TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose) {
-    if (verbose) {std::cout << "Running HitTimeResidualsMCPosition()" << std::endl;}
-
-    TH1D* histTimeResiduals = new TH1D("pdfTimeResidualsMC", "PDF for Hit time residuals using the MC position", 1300, -300.5, 999.5);
-    // If this is being done on data that does not require remote database connection
-    // eg.: a simple simulation with default run number (0)
-    // We can disable the remote connections:
-    //
-    // NOTE: Don't do this if you are using real data!!!
-    RAT::DB::Get()->SetAirplaneModeStatus(true);
-    RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
-
-    unsigned int num_evts = 0;
-    for (unsigned int i = 0; i < fileNames.size(); ++i) {
-        RAT::DU::DSReader dsReader(fileNames.at(i));
-
-        if (verbose) {std::cout << "Looping through entries..." << std::endl;}
-        unsigned int evt_idx = 0;
-        for(size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); iEntry++) {
-            const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
-            const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
-            for(size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
-                const RAT::DS::EV& rEV = rDS.GetEV(iEV);
-
-                std::vector<unsigned int> passed_evt_indices = apply_cuts(cuts_name, iEV, rDS, rEV);
-                // Add passed events to histograms
-                for (unsigned int j = 0; j < passed_evt_indices.size(); ++j) {
-                    const RAT::DS::EV& passed_evt = rDS.GetEV(passed_evt_indices.at(j));
-                    const RAT::DS::CalPMTs& calibratedPMTs = passed_evt.GetCalPMTs();
-                    if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
-                    // Use new time residual calculator
-                    for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-                        const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-                        // FIX:
-                        histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(passed_evt_indices.at(j)).GetGTTime()));  // event time is 390ns - GT time.
-                    }
-                    if (verbose) {std::cout << "...added." << std::endl;}
-                    ++num_evts;
-                    ++evt_idx;
-                }
-            }
-        }
-        dsReader.Delete();
-    }
-    std::cout << "Number of events recorded = " << num_evts << std::endl;
-
-    histTimeResiduals->GetYaxis()->SetTitle( "Count per 1 ns bin" );
-    histTimeResiduals->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
-    histTimeResiduals->Draw();
-    return histTimeResiduals;
-}
-
-
-/**
- * @brief Make hit time residual histogram using Fit position and event time (summed over all events).
- * 
- * @param fileNames Simulation root file .
- * @param delays Vector of o-Ps decay times.
- * @param vol_cut Volume cut, given by radius in mm.
- * @param is_oPs Are events we wish to look at only o-Ps events? If so, ignore delay=0 events (some get simulated anyway for some reason, so cut them out here).
- * @param verbose
- * @param fitName Which fitter to use if not default.
- */
-TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName) {
+TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName) {
     if (verbose) {std::cout << "Running HitTimeResidualsFitPosition()" << std::endl;}
 
-    TH1D* histTimeResiduals = new TH1D("hHitTimeResidualsFit", "Hit time residuals using the Fit position", 1300, -300.5, 999.5);
+    if (type != "true" && type != "recon") {
+        std::cout << "info_type should be 'true' or 'recon', not '" << type << "'." << std::endl;
+        exit(1);
+    }
+
+    std::string hist_name = "hHitTimeResiduals_" + type;
+    std::string hist_title = "Hit time residuals using the " + type + " position";
+    TH1D* histTimeResiduals = new TH1D(hist_name.c_str(), hist_title.c_str(), 1300, -300.5, 999.5);
     // If this is being done on data that does not require remote database connection
     // eg.: a simple simulation with default run number (0)
     // We can disable the remote connections:
@@ -326,23 +271,30 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
     unsigned int num_evts = 0;
     for (unsigned int i = 0; i < fileNames.size(); ++i) {
         RAT::DU::DSReader dsReader(fileNames.at(i));
-
         if (verbose) {std::cout << "Looping through entries..." << std::endl;}
-        unsigned int evt_idx = 0;
         for (size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); iEntry++) {
-            const RAT::DS::Entry& rDS = dsReader.GetEntry( iEntry );
+            const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
             for (size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
                 const RAT::DS::EV& rEV = rDS.GetEV(iEV);
 
+                // Get indices of events that pass cuts
                 std::vector<unsigned int> passed_evt_indices = apply_cuts(cuts_name, iEV, rDS, rEV, fitName);
                 // Add passed events to histograms
                 for (unsigned int j = 0; j < passed_evt_indices.size(); ++j) {
                     const RAT::DS::EV& passed_evt = rDS.GetEV(passed_evt_indices.at(j));
 
-                    // Get recon info
-                    std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, fitName);
-                    TVector3 evt_pos = TVector3(evt_recon_info.at(1), evt_recon_info.at(2), evt_recon_info.at(3));
-                    double evt_time = evt_recon_info.at(4);
+                    // Get event info
+                    TVector3 evt_pos;
+                    double evt_time;
+                    if (type == 'recon') {
+                        std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, fitName);
+                        evt_pos = TVector3(evt_recon_info.at(1), evt_recon_info.at(2), evt_recon_info.at(3));
+                        evt_time = evt_recon_info.at(4);
+                    } else {
+                        std::vector<double> evt_true_info = getMCInfo(iEV, rDS);
+                        evt_pos = TVector3(evt_true_info.at(1), evt_true_info.at(2), evt_true_info.at(3));
+                        evt_time = evt_true_info.at(4);
+                    }
 
                     // calculate time residuals
                     const RAT::DS::CalPMTs& calibratedPMTs = passed_evt.GetCalPMTs();
@@ -352,11 +304,9 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
                         const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
                         histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, evt_pos, evt_time));
                     }
-                        
+                    if (verbose) {std::cout << "...added." << std::endl;}
+                    ++num_evts;
                 }
-                if (verbose) {std::cout << "...added." << std::endl;}
-                ++num_evts;
-                ++evt_idx;
             }
         }
         dsReader.Delete();
@@ -368,7 +318,6 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
     histTimeResiduals->Draw();
     return histTimeResiduals;
 }
-
 
 
 
@@ -383,11 +332,13 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
  * @param evt_idx 
  * @param entry 
  * @param evt 
- * @return int 
+ * @param info_type 
+ * @param fitName 
+ * @return std::vector<unsigned int> 
  */
 std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
-    if (info_type != "MC" && info_type != "recon") {
-        std::cout << "info_type should be 'MC' or 'recon', not '" << info_type << "'." << std::endl;
+    if (info_type != "true" && info_type != "recon") {
+        std::cout << "info_type should be 'true' or 'recon', not '" << info_type << "'." << std::endl;
         exit(1);
     }
     if (cuts_name == "alphaN") {
@@ -423,7 +374,7 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
         if (info_type == "recon") {
             prompt_info =  getReconInfo(0, entry, fitName);
         } else {
-            prompt_info =  getMCInfo(0, entry);
+            prompt_info =  getMCInfo(0, entry);  // FIXME: Add energy to event energy if e+? 1.02MeV
         }
         if (prompt_info.size() != 4) {return passed_evt_indices;}
         double prompt_energy = prompt_info.at(0);
@@ -433,15 +384,15 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
         // For delayed event
         // unsigned int delayed_nhits = delayed_evt.GetNhitsCleaned();
         double delayed_time = evt.GetClockCount50() * 20.0;  // nanoseconds
-        std::vector<double> delayed_recon_info =  getReconInfo(evt, fitName);
+        std::vector<double> delayed_info;
         if (info_type == "recon") {
-            prompt_info =  getReconInfo(evt_idx, entry, fitName);
+            delayed_info =  getReconInfo(evt_idx, entry, fitName);
         } else {
-            prompt_info =  getMCInfo(evt_idx, entry);
+            delayed_info =  getMCInfo(evt_idx, entry);  // FIXME: Add energy to event energy if e+? 1.02MeV
         }
-        if (delayed_recon_info.size() != 4) {return passed_evt_indices;}
-        double delayed_energy = delayed_recon_info.at(0);
-        TVector3 delayed_pos = TVector3(delayed_recon_info.at(1), delayed_recon_info.at(2), delayed_recon_info.at(3));
+        if (delayed_info.size() != 4) {return passed_evt_indices;}
+        double delayed_energy = delayed_info.at(0);
+        TVector3 delayed_pos = TVector3(delayed_info.at(1), delayed_info.at(2), delayed_info.at(3));
         double delayed_R = delayed_pos.Mag();
 
         // Combined info
@@ -518,8 +469,11 @@ std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& ent
  */
 std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry) {
     double energy = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
+    if (entry.GetMC().GetMCParticle(evt_idx).GetPDGCode() == -11) {  // If it's a e+ (See PDG encoding in geant4.10.00.p04/source/particle/leptons/src/G4Positron.cc)
+        energy += 1.02;  // Add e+e- annihilation energy to kinetic energy to get event energy.
+    }
     const TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
-    double time = entry.GetMCEV(evt_idx).GetGTTime();
+    double time = 390 - entry.GetMCEV(evt_idx).GetGTTime();  // event time is 390ns - GT time.
 
     std::vector<double> output_vector = {energy, pos.X(), pos.Y(), pos.Z(), time};
     return output_vector;
