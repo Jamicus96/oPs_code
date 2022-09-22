@@ -42,12 +42,18 @@
 
 std::vector<std::vector<double> > findPositronDelays(const std::vector<std::string>& filenames, bool verbose);
 void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hist);
-TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose);
-TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose, std::string fitName = "");
+TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose);
+TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName = "");
+std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
+std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
+std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName = "");
+std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry);
+
+
 
 int main(int argc, char** argv) {
     std::string output_file = argv[1];
-    bool is_oPs = std::stoi(argv[2]);
+    std::string cuts_name = argv[2];
     bool verbose = std::stoi(argv[3]);
     // Addresses of sim files to be analysed
     std::vector<std::string> input_files;
@@ -62,8 +68,8 @@ int main(int argc, char** argv) {
 
     // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
-    TH1D* MC_summed_hist = HitTimeResidualsMCPosition(input_files, delays, 5700, is_oPs, verbose);
-    TH1D* Fitted_summed_hist = HitTimeResidualsFitPosition(input_files, delays, 5700, is_oPs, verbose);
+    TH1D* MC_summed_hist = HitTimeResidualsMCPosition(input_files, delays, cuts_name, verbose);
+    TH1D* Fitted_summed_hist = HitTimeResidualsFitPosition(input_files, delays, cuts_name, verbose);
 
     // Get o-Ps pdf and print to file
     printPDF(output_file, MC_summed_hist, Fitted_summed_hist);
@@ -242,7 +248,7 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
  * @param is_oPs Are events we wish to look at only o-Ps events? If so, ignore delay=0 events (some get simulated anyway for some reason, so cut them out here).
  * @param verbose
  */
-TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose) {
+TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose) {
     if (verbose) {std::cout << "Running HitTimeResidualsMCPosition()" << std::endl;}
 
     TH1D* histTimeResiduals = new TH1D("pdfTimeResidualsMC", "PDF for Hit time residuals using the MC position", 1300, -300.5, 999.5);
@@ -265,26 +271,18 @@ TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std:
             const TVector3 eventPosition = rDS.GetMC().GetMCParticle(0).GetPosition(); // At least 1 is somewhat guaranteed
             for(size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
                 const RAT::DS::EV& rEV = rDS.GetEV(iEV);
-                const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
-                if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
-                if (evt_idx >= delays.size()) {
-                    if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
-                    if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else if (eventPosition.Mag() > vol_cut) {
-                    if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else {
+
+                std::vector<unsigned int> passed_evt_indices = apply_cuts(cuts_name, iEV, rDS, rEV);
+                // Add passed events to histograms
+                for (unsigned int j = 0; j < passed_evt_indices.size(); ++j) {
+                    const RAT::DS::EV& passed_evt = rDS.GetEV(passed_evt_indices.at(j));
+                    const RAT::DS::CalPMTs& calibratedPMTs = passed_evt.GetCalPMTs();
                     if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
                     // Use new time residual calculator
                     for(size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
                         const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-                        histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(iEV).GetGTTime()));  // event time is 390ns - GT time.
+                        // FIX:
+                        histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, 390 - rDS.GetMCEV(passed_evt_indices.at(j)).GetGTTime()));  // event time is 390ns - GT time.
                     }
                     if (verbose) {std::cout << "...added." << std::endl;}
                     ++num_evts;
@@ -313,7 +311,7 @@ TH1D* HitTimeResidualsMCPosition(const std::vector<std::string>& fileNames, std:
  * @param verbose
  * @param fitName Which fitter to use if not default.
  */
-TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, std::vector<double> delays, double vol_cut, bool is_oPs, bool verbose, std::string fitName) {
+TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName) {
     if (verbose) {std::cout << "Running HitTimeResidualsFitPosition()" << std::endl;}
 
     TH1D* histTimeResiduals = new TH1D("hHitTimeResidualsFit", "Hit time residuals using the Fit position", 1300, -300.5, 999.5);
@@ -334,65 +332,27 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
         for (size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); iEntry++) {
             const RAT::DS::Entry& rDS = dsReader.GetEntry( iEntry );
             for (size_t iEV = 0; iEV < rDS.GetEVCount(); iEV++) {
-                const RAT::DS::EV& rEV = rDS.GetEV( iEV );
+                const RAT::DS::EV& rEV = rDS.GetEV(iEV);
 
-                // grab the fit information
-                if(fitName == "")
-                    fitName = rEV.GetDefaultFitName();
+                std::vector<unsigned int> passed_evt_indices = apply_cuts(cuts_name, iEV, rDS, rEV, fitName);
+                // Add passed events to histograms
+                for (unsigned int j = 0; j < passed_evt_indices.size(); ++j) {
+                    const RAT::DS::EV& passed_evt = rDS.GetEV(passed_evt_indices.at(j));
 
-                TVector3 eventPosition;
-                double   eventTime;
+                    // Get recon info
+                    std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, fitName);
+                    TVector3 evt_pos = TVector3(evt_recon_info.at(1), evt_recon_info.at(2), evt_recon_info.at(3));
+                    double evt_time = evt_recon_info.at(4);
 
-                try{
-                    const RAT::DS::FitVertex& rVertex = rEV.GetFitResult(fitName).GetVertex(0);
-                    if(!(rVertex.ValidPosition() && rVertex.ValidTime()))
-                        continue; // fit invalid
-
-                    eventPosition = rVertex.GetPosition();
-                    eventTime = rVertex.GetTime();
-                }
-                catch(const RAT::DS::FitCollection::NoResultError&){
-                    // no fit result by the name of fitName
-                    continue;
-                }
-                catch (const RAT::DS::FitResult::NoVertexError&){
-                    // no fit vertex
-                    continue;
-                }
-                catch(const RAT::DS::FitVertex::NoValueError&){
-                    // position or time missing
-                    continue;
-                }
-                // DataNotFound --> implies no fit results are present, don't catch.
-
-                // calculate time residuals
-                const RAT::DS::CalPMTs& calibratedPMTs = rEV.GetCalPMTs();
-                unsigned int nhits = rEV.GetNhitsCleaned();
-                if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
-                if (evt_idx >= delays.size()) {
-                    if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
-                    if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else if (eventPosition.Mag() > vol_cut) {
-                    if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else if (nhits < 200 || nhits > 6000) {
-                    if (verbose) {std::cout << "Outside nhit cut, ignoring event." << std::endl;}
-                    ++evt_idx;
-                    continue;
-                } else {
+                    // calculate time residuals
+                    const RAT::DS::CalPMTs& calibratedPMTs = passed_evt.GetCalPMTs();
                     if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
                     // Use new time residual calculator
                     for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
                         const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-                        histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, eventPosition, eventTime));
-                        
+                        histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, evt_pos, evt_time));
                     }
+                        
                 }
                 if (verbose) {std::cout << "...added." << std::endl;}
                 ++num_evts;
@@ -407,4 +367,160 @@ TH1D* HitTimeResidualsFitPosition( const std::vector<std::string>& fileNames, st
     histTimeResiduals->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
     histTimeResiduals->Draw();
     return histTimeResiduals;
+}
+
+
+
+
+/* ~~~~~~~~~~~~~~~~~~~~~~ CUT FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~ */
+
+
+/**
+ * @brief Returns indices of events that pass cut, for a specific entry.
+ * (In the alpha-n case only prompt events from combined prompt-delayed events that pass cuts will be returned).
+ * 
+ * @param cuts_name 
+ * @param evt_idx 
+ * @param entry 
+ * @param evt 
+ * @return int 
+ */
+std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
+    if (info_type != "MC" && info_type != "recon") {
+        std::cout << "info_type should be 'MC' or 'recon', not '" << info_type << "'." << std::endl;
+        exit(1);
+    }
+    if (cuts_name == "alphaN") {
+        return alphaN_cuts(cuts_name, evt_idx, entry, evt, info_type, fitName);
+    } else {
+        std::vector<unsigned int> automatic_pass = {evt_idx};
+        return automatic_pass;
+    }
+}
+
+/**
+ * @brief Applies alphaN cut. If delayed event is inputted, and both prompt and delayed events pass cuts,
+ * the prompt event index only will be returned.
+ * 
+ * @param cuts_name 
+ * @param evt_idx 
+ * @param entry 
+ * @param evt 
+ * @return std::vector<unsigned int> 
+ */
+std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
+    std::vector<unsigned int> passed_evt_indices;
+
+    // Only pass the prompt event this is the delayed event, so we know it has a delayed event
+    if (evt_idx != 1) {return passed_evt_indices;}
+
+    // Get relevent info for cuts
+        // For prompt event
+        const RAT::DS::EV& prompt_evt = entry.GetEV(0);
+        // unsigned int prompt_nhits = prompt_evt.GetNhitsCleaned();
+        double prompt_time = prompt_evt.GetClockCount50() * 20.0;  // nanoseconds
+        std::vector<double> prompt_info;
+        if (info_type == "recon") {
+            prompt_info =  getReconInfo(0, entry, fitName);
+        } else {
+            prompt_info =  getMCInfo(0, entry);
+        }
+        if (prompt_info.size() != 4) {return passed_evt_indices;}
+        double prompt_energy = prompt_info.at(0);
+        TVector3 prompt_pos = TVector3(prompt_info.at(1), prompt_info.at(2), prompt_info.at(3));
+        double prompt_R = prompt_pos.Mag();
+
+        // For delayed event
+        // unsigned int delayed_nhits = delayed_evt.GetNhitsCleaned();
+        double delayed_time = evt.GetClockCount50() * 20.0;  // nanoseconds
+        std::vector<double> delayed_recon_info =  getReconInfo(evt, fitName);
+        if (info_type == "recon") {
+            prompt_info =  getReconInfo(evt_idx, entry, fitName);
+        } else {
+            prompt_info =  getMCInfo(evt_idx, entry);
+        }
+        if (delayed_recon_info.size() != 4) {return passed_evt_indices;}
+        double delayed_energy = delayed_recon_info.at(0);
+        TVector3 delayed_pos = TVector3(delayed_recon_info.at(1), delayed_recon_info.at(2), delayed_recon_info.at(3));
+        double delayed_R = delayed_pos.Mag();
+
+        // Combined info
+        double deltaT = delayed_time - prompt_time;
+        double delta_R = (delayed_pos - prompt_pos).Mag();
+
+    // Apply cuts
+    if (prompt_energy < 0.9 or prompt_energy > 8.0) {return passed_evt_indices;}
+    if (delayed_energy < 1.85 or delayed_energy > 2.4) {return passed_evt_indices;}
+    if (prompt_R > 5700 or delayed_R > 5700) {return passed_evt_indices;}  // in mm
+    if (delta_R > 1500) {return passed_evt_indices;}  // in mm
+    if (delayed_time < 400 or delayed_time > 0.8E6) {return passed_evt_indices;}  // in ns
+    if (prompt_energy > 3.5) {return passed_evt_indices;}
+
+    // Passed all cuts, return prompt event index
+    passed_evt_indices = {0};
+    return passed_evt_indices;
+}
+
+std::vector<unsigned int> oPs_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
+    // if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
+    // if (evt_idx >= delays.size()) {
+    //     if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
+    //     ++evt_idx;
+    //     continue;
+    // } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
+    //     if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
+    //     ++evt_idx;
+    //     continue;
+    // } else if (eventPosition.Mag() > vol_cut) {
+    //     if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
+    //     ++evt_idx;
+    //     continue;
+    // } else if (nhits < 200 || nhits > 6000) {
+    //     if (verbose) {std::cout << "Outside nhit cut, ignoring event." << std::endl;}
+    //     ++evt_idx;
+    //     continue;
+}
+
+
+/**
+ * @brief Get the reconstructed energy and position of an event as {E, x, y, z, t}.
+ * If error in reconstruction, returns empty vector.
+ * 
+ * @param evt 
+ * @return std::vector<double> 
+ */
+std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName) {
+    const RAT::DS::EV& evt = entry.GetEV(evt_idx);
+    std::vector<double> output_vector;
+    // grab the fit information
+    if(fitName == "")
+        fitName = evt.GetDefaultFitName();
+    try {
+        const RAT::DS::FitVertex& rVertex = evt.GetFitResult(fitName).GetVertex(0);
+        if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {return output_vector;} // fit invalid
+        double energy = rVertex.GetEnergy();
+        TVector3 pos = rVertex.GetPosition();
+        double time = rVertex.GetTime();
+        output_vector = {energy, pos.X(), pos.Y(), pos.Z(), time};
+    }
+    catch (const RAT::DS::FitCollection::NoResultError&) {return output_vector;} // no fit result by the name of fitName
+    catch (const RAT::DS::FitResult::NoVertexError&) {return output_vector;} // no fit vertex
+    catch (const RAT::DS::FitVertex::NoValueError&) {return output_vector;} // position or time missing
+
+    return output_vector;
+}
+
+/**
+ * @brief Get the MC energy and position of an event as {E, x, y, z, t}.
+ * 
+ * @param evt 
+ * @return std::vector<double> 
+ */
+std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry) {
+    double energy = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
+    const TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
+    double time = entry.GetMCEV(evt_idx).GetGTTime();
+
+    std::vector<double> output_vector = {energy, pos.X(), pos.Y(), pos.Z(), time};
+    return output_vector;
 }
