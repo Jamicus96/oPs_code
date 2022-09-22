@@ -41,8 +41,8 @@
 #include <fstream>
 
 std::vector<std::vector<double> > findPositronDelays(const std::vector<std::string>& filenames, bool verbose);
-void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hist);
-TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName = "");
+void printPDF(const std::string& output_filename, std::vector<TH1D*> MC_hist, std::vector<TH1D*> Fitted_hist);
+std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, bool verbose, std::string fitName = "");
 std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
 std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
 std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName = "");
@@ -52,11 +52,10 @@ std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry)
 
 int main(int argc, char** argv) {
     std::string output_file = argv[1];
-    std::string cuts_name = argv[2];
-    bool verbose = std::stoi(argv[3]);
+    bool verbose = std::stoi(argv[2]);
     // Addresses of sim files to be analysed
     std::vector<std::string> input_files;
-    for (unsigned int i = 4; i < argc; ++i) {
+    for (unsigned int i = 3; i < argc; ++i) {
         input_files.push_back(argv[i]);
     }
 
@@ -67,11 +66,11 @@ int main(int argc, char** argv) {
 
     // Create time residual histograms (copied from rat/example/root/PlotHitTimeResiduals.cc)
     if (verbose) {std::cout << "Getting hists..." << std::endl;}
-    TH1D* MC_summed_hist = HitTimeResiduals("true", input_files, delays, cuts_name, verbose);
-    TH1D* Fitted_summed_hist = HitTimeResiduals("recon", input_files, delays, cuts_name, verbose);
+    std::vector<TH1D*> MC_summed_hists = HitTimeResiduals("true", input_files, delays, verbose);
+    std::vector<TH1D*> Fitted_summed_hists = HitTimeResiduals("recon", input_files, delays, verbose);
 
     // Get o-Ps pdf and print to file
-    printPDF(output_file, MC_summed_hist, Fitted_summed_hist);
+    printPDF(output_file, MC_summed_hists, Fitted_summed_hists);
 
     // Create output root file if recordeing extra info
     if (verbose) {
@@ -88,8 +87,10 @@ int main(int argc, char** argv) {
         // Now write everything to the file and close
         if (verbose) {std::cout << "Writing everything to file and closing" << std::endl;}
         rootfile->cd();
-        MC_summed_hist->Write();
-        Fitted_summed_hist->Write();
+        for (unsigned int i = 0; i < MC_summed_hists.size(); ++i) {
+            MC_summed_hists.at(i)->Write();
+            Fitted_summed_hists.at(i)->Write();
+        }
 
         // raw_hist->Write();
         rootfile->Write();
@@ -169,38 +170,44 @@ std::vector<std::vector<double> > findPositronDelays(const std::vector<std::stri
  * @param MC_hist 
  * @param Fitted_hist 
  */
-void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hist) {
+void printPDF(const std::string& output_filename, std::vector<TH1D*> MC_hists, std::vector<TH1D*> Fitted_hists) {
 
     // Open file to print results to
     std::ofstream datafile;
     datafile.open(output_filename, std::ofstream::out | std::ofstream::trunc);
     datafile << "[";
 
-    double bin_width = MC_hist->GetBinCenter(2) - MC_hist->GetBinCenter(1);
-    unsigned int N_bins = MC_hist->GetNbinsX();
+    double bin_width = MC_hists.at(0)->GetBinCenter(2) - MC_hists.at(0)->GetBinCenter(1);
+    unsigned int N_bins = MC_hists.at(0)->GetNbinsX();
 
     // Checks
-    if (bin_width != Fitted_hist->GetBinCenter(2) - Fitted_hist->GetBinCenter(1)) {
+    if (bin_width != Fitted_hists.at(0)->GetBinCenter(2) - Fitted_hists.at(0)->GetBinCenter(1)) {
         std::cout << "Bin widths different" << std::endl;
         exit(1);
     }
-    if (N_bins != Fitted_hist->GetNbinsX()) {
+    if (N_bins != Fitted_hists.at(0)->GetNbinsX()) {
         std::cout << "Number of bins different" << std::endl;
         exit(1);
     }
 
-    double tot_MC_hits = 0.0;
-    double tot_Fitted_hits = 0.0;
+    std::vector<double> tot_MC_hits = {0.0, 0.0, 0.0};
+    std::vector<double> tot_Fitted_hits = {0.0, 0.0, 0.0};
     std::vector<double> times;
-    std::vector<double> MC_probs;
-    std::vector<double> Fitted_probs;
+    std::vector<std::vector<double>> MC_probs;
+    std::vector<std::vector<double>> Fitted_probs;
     // Get histogram bin values
     for (unsigned int i = 1; i < N_bins+1; ++i) { //loop over histogram bins
-        times.push_back(MC_hist->GetBinCenter(i));
-        MC_probs.push_back(MC_hist->GetBinContent(i));
-        tot_MC_hits += MC_probs.at(i-1);
-        Fitted_probs.push_back(Fitted_hist->GetBinContent(i));
-        tot_Fitted_hits += Fitted_probs.at(i-1);
+        times.push_back(MC_hists.at(0)->GetBinCenter(i));
+        std::vector<double> MC_prob;
+        std::vector<double> Fitted_prob;
+        for (unsigned int j = 0; j < MC_hists.size(); ++j) {
+            MC_prob.push_back(MC_hists.at(j)->GetBinContent(i));
+            tot_MC_hits.at(j) += MC_probs.at(j).at(i-1);
+            Fitted_prob.push_back(Fitted_hists.at(j)->GetBinContent(i));
+            tot_Fitted_hits.at(j) += Fitted_probs.at(j).at(i-1);
+        }
+        MC_probs.push_back(MC_prob);
+        Fitted_probs.push_back(Fitted_prob);
 
         // print times to file while at it
         datafile << times.at(i-1);
@@ -210,30 +217,36 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
     }
     datafile << "]" << std::endl;
 
-    std::cout << "Total number of MC PMT hits = " << tot_MC_hits << std::endl;
-    std::cout << "Total number of Fitted PMT hits = " << tot_Fitted_hits << std::endl;
+    for (unsigned int i = 0; i < MC_hists.size(); ++i) {
+        std::cout << "Total number of MC PMT hits in PDF " << i << " = " << tot_MC_hits.at(i) << std::endl;
+        std::cout << "Total number of Fitted PMT hits in PDF " << i << " = " << tot_Fitted_hits.at(i) << std::endl;
+    }
 
     // Normalise MC to pdf
     datafile << "[";
-    for (unsigned int i = 0; i < MC_probs.size(); ++i) {
-        MC_probs.at(i) /= (tot_MC_hits * bin_width);
-        datafile << MC_probs.at(i);
-        if (i < MC_probs.size() - 1) {
-            datafile << ", ";
+    for (unsigned int j = 0; j < MC_hists.size(); ++j) {
+        for (unsigned int i = 0; i < MC_probs.size(); ++i) {
+            MC_probs.at(i).at(j) /= (tot_MC_hits.at(j) * bin_width);
+            datafile << MC_probs.at(i).at(j);
+            if (i < MC_probs.size() - 1) {
+                datafile << ", ";
+            }
         }
+        datafile << "]" << std::endl;
     }
-    datafile << "]" << std::endl;
 
     // Normalise Fitted to pdf
     datafile << "[";
-    for (unsigned int i = 0; i < Fitted_probs.size(); ++i) {
-        Fitted_probs.at(i) /= (tot_Fitted_hits * bin_width);
-        datafile << Fitted_probs.at(i);
-        if (i < Fitted_probs.size() - 1) {
-            datafile << ", ";
+    for (unsigned int j = 0; j < Fitted_probs.size(); ++j) {
+        for (unsigned int i = 0; i < Fitted_probs.size(); ++i) {
+            Fitted_probs.at(i).at(j) /= (tot_Fitted_hits.at(j) * bin_width);
+            datafile << Fitted_probs.at(i).at(j);
+            if (i < Fitted_probs.size() - 1) {
+                datafile << ", ";
+            }
         }
+        datafile << "]" << std::endl;
     }
-    datafile << "]" << std::endl;
 
     datafile.close();
 }
@@ -249,7 +262,7 @@ void printPDF(const std::string& output_filename, TH1D* MC_hist, TH1D* Fitted_hi
  * @param fitName
  * @return TH1D*
  */
-TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, std::string cuts_name, bool verbose, std::string fitName) {
+std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, bool verbose, std::string fitName) {
     if (verbose) {std::cout << "Running HitTimeResidualsFitPosition()" << std::endl;}
 
     if (type != "true" && type != "recon") {
@@ -257,9 +270,12 @@ TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNam
         exit(1);
     }
 
-    std::string hist_name = "hHitTimeResiduals_" + type;
-    std::string hist_title = "Hit time residuals using the " + type + " position";
-    TH1D* histTimeResiduals = new TH1D(hist_name.c_str(), hist_title.c_str(), 1300, -300.5, 999.5);
+    std::vector<TH1D*> histograms;
+    for (unsigned int i = 0; i < 3; ++i) {
+        std::string hist_name = "hHitTimeResiduals_" + type + "_" + to_string(i);
+        std::string hist_title = "Hit time residuals using the " + type + " position" + ", " + to_string(i);
+        histograms.push_back(new TH1D(hist_name.c_str(), hist_title.c_str(), 1300, -300.5, 999.5));
+    }
     // If this is being done on data that does not require remote database connection
     // eg.: a simple simulation with default run number (0)
     // We can disable the remote connections:
@@ -278,34 +294,40 @@ TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNam
                 const RAT::DS::EV& rEV = rDS.GetEV(iEV);
 
                 // Get indices of events that pass cuts
-                std::vector<unsigned int> passed_evt_indices = apply_cuts(cuts_name, iEV, rDS, rEV, fitName);
+                std::vector<std::vector<unsigned int>> passed_evt_indices_list;
+                passed_evt_indices_list.push_back(apply_cuts("alphaN_1", iEV, rDS, rEV, fitName));
+                passed_evt_indices_list.push_back(apply_cuts("alphaN_2", iEV, rDS, rEV, fitName));
+                passed_evt_indices_list.push_back(apply_cuts("alphaN_3", iEV, rDS, rEV, fitName));
                 // Add passed events to histograms
-                for (unsigned int j = 0; j < passed_evt_indices.size(); ++j) {
-                    const RAT::DS::EV& passed_evt = rDS.GetEV(passed_evt_indices.at(j));
+                for (unsigned int j; j < passed_evt_indices_list.size(); ++j) {
+                    std::vector<unsigned int> passed_evt_indices = passed_evt_indices_list.at(j);
+                    for (unsigned int k = 0; k < passed_evt_indices.size(); ++k) {
+                        const RAT::DS::EV& passed_evt = rDS.GetEV(passed_evt_indices.at(k));
 
-                    // Get event info
-                    TVector3 evt_pos;
-                    double evt_time;
-                    if (type == 'recon') {
-                        std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, fitName);
-                        evt_pos = TVector3(evt_recon_info.at(1), evt_recon_info.at(2), evt_recon_info.at(3));
-                        evt_time = evt_recon_info.at(4);
-                    } else {
-                        std::vector<double> evt_true_info = getMCInfo(iEV, rDS);
-                        evt_pos = TVector3(evt_true_info.at(1), evt_true_info.at(2), evt_true_info.at(3));
-                        evt_time = evt_true_info.at(4);
-                    }
+                        // Get event info
+                        TVector3 evt_pos;
+                        double evt_time;
+                        if (type == "recon") {
+                            std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, fitName);
+                            evt_pos = TVector3(evt_recon_info.at(1), evt_recon_info.at(2), evt_recon_info.at(3));
+                            evt_time = evt_recon_info.at(4);
+                        } else {
+                            std::vector<double> evt_true_info = getMCInfo(iEV, rDS);
+                            evt_pos = TVector3(evt_true_info.at(1), evt_true_info.at(2), evt_true_info.at(3));
+                            evt_time = evt_true_info.at(4);
+                        }
 
-                    // calculate time residuals
-                    const RAT::DS::CalPMTs& calibratedPMTs = passed_evt.GetCalPMTs();
-                    if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
-                    // Use new time residual calculator
-                    for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-                        const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-                        histTimeResiduals->Fill(fTRCalc.CalcTimeResidual(pmtCal, evt_pos, evt_time));
+                        // calculate time residuals
+                        const RAT::DS::CalPMTs& calibratedPMTs = passed_evt.GetCalPMTs();
+                        if (verbose) {std::cout << "Adding event to histogram." << std::endl;}
+                        // Use new time residual calculator
+                        for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+                            const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
+                            histograms.at(j)->Fill(fTRCalc.CalcTimeResidual(pmtCal, evt_pos, evt_time));
+                        }
+                        if (verbose) {std::cout << "...added." << std::endl;}
+                        ++num_evts;
                     }
-                    if (verbose) {std::cout << "...added." << std::endl;}
-                    ++num_evts;
                 }
             }
         }
@@ -313,10 +335,13 @@ TH1D* HitTimeResiduals(std::string type, const std::vector<std::string>& fileNam
     }
     std::cout << "Number of events recorded = " << num_evts << std::endl;
 
-    histTimeResiduals->GetYaxis()->SetTitle( "Count per 1 ns bin" );
-    histTimeResiduals->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
-    histTimeResiduals->Draw();
-    return histTimeResiduals;
+    for (unsigned int i = 0; i < histograms.size(); ++i) {
+        histograms.at(i)->GetYaxis()->SetTitle( "Count per 1 ns bin" );
+        histograms.at(i)->GetXaxis()->SetTitle( "Hit time residuals [ns]" );
+        histograms.at(i)->Draw();
+    }
+
+    return histograms;
 }
 
 
@@ -341,7 +366,7 @@ std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx
         std::cout << "info_type should be 'true' or 'recon', not '" << info_type << "'." << std::endl;
         exit(1);
     }
-    if (cuts_name == "alphaN") {
+    if (cuts_name == "alphaN_1" || cuts_name == "alphaN_2" || cuts_name == "alphaN_3") {
         return alphaN_cuts(cuts_name, evt_idx, entry, evt, info_type, fitName);
     } else {
         std::vector<unsigned int> automatic_pass = {evt_idx};
@@ -406,6 +431,22 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
     if (delta_R > 1500) {return passed_evt_indices;}  // in mm
     if (delayed_time < 400 or delayed_time > 0.8E6) {return passed_evt_indices;}  // in ns
     if (prompt_energy > 3.5) {return passed_evt_indices;}
+
+    // Extra cuts
+        // index: "te_diol_dda_0p5_labppo_scintillator_bisMSB_Jan2018",
+        // nhit_threshold: [1500, 2000],
+        // energy_threshold: [4.0, 5.4],
+        //
+        // index: "labppo_1p1_berkeley_scintillator",
+        // nhit_threshold: [1300, 1700],
+        // energy_threshold: [3.5, 5.4],
+        //
+        // index: "labppo_0p5_scintillator",
+        // nhit_threshold: [1200, 1550],
+        // energy_threshold: [3.5, 5.4],
+    if (cuts_name == "alphaN_1" && prompt_energy >= 3.5) {return passed_evt_indices;}
+    if (cuts_name == "alphaN_2" && (prompt_energy < 3.5 || prompt_energy > 5.4)) {return passed_evt_indices;}
+    if (cuts_name == "alphaN_3" && prompt_energy <= 5.4) {return passed_evt_indices;}
 
     // Passed all cuts, return prompt event index
     passed_evt_indices = {0};
