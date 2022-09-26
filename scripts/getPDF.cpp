@@ -43,8 +43,8 @@
 std::vector<std::vector<double> > findPositronDelays(const std::vector<std::string>& filenames, bool verbose);
 void printPDF(const std::string& output_filename, std::vector<TH1D*> MC_hist, std::vector<TH1D*> Fitted_hist);
 std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, bool verbose, std::string fitName = "");
-std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
-std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string fitName = "");
+std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName = "");
+std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName = "");
 std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName = "");
 std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry);
 
@@ -453,25 +453,25 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
     return passed_evt_indices;
 }
 
-std::vector<unsigned int> oPs_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
-    // if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
-    // if (evt_idx >= delays.size()) {
-    //     if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
-    //     ++evt_idx;
-    //     continue;
-    // } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
-    //     if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
-    //     ++evt_idx;
-    //     continue;
-    // } else if (eventPosition.Mag() > vol_cut) {
-    //     if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
-    //     ++evt_idx;
-    //     continue;
-    // } else if (nhits < 200 || nhits > 6000) {
-    //     if (verbose) {std::cout << "Outside nhit cut, ignoring event." << std::endl;}
-    //     ++evt_idx;
-    //     continue;
-}
+// std::vector<unsigned int> oPs_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
+//     if (verbose) {std::cout << "evt_idx = " << evt_idx << std::endl;}
+//     if (evt_idx >= delays.size()) {
+//         if (verbose) {std::cout << "evt_idx out of range of delays vector" << std::endl;}
+//         ++evt_idx;
+//         continue;
+//     } else if (is_oPs && delays.at(evt_idx) == 0.0) {  // Filter out non o-Ps events
+//         if (verbose) {std::cout << "Delay = 0, ignoring event." << std::endl;}
+//         ++evt_idx;
+//         continue;
+//     } else if (eventPosition.Mag() > vol_cut) {
+//         if (verbose) {std::cout << "Outside volume cut, ignoring event." << std::endl;}
+//         ++evt_idx;
+//         continue;
+//     } else if (nhits < 200 || nhits > 6000) {
+//         if (verbose) {std::cout << "Outside nhit cut, ignoring event." << std::endl;}
+//         ++evt_idx;
+//         continue;
+// }
 
 
 /**
