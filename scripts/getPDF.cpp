@@ -30,7 +30,8 @@
 #include <RAT/TrackNode.hh>
 #include <RAT/DB.hh>
 
-#include <TH1D.h>
+#include <TH1.h>
+#include <TH2.h>
 #include <TCanvas.h>
 #include <TLegend.h>
 #include <TStyle.h>
@@ -43,10 +44,11 @@
 std::vector<std::vector<double> > findPositronDelays(const std::vector<std::string>& filenames, bool verbose);
 void printPDF(const std::string& output_filename, std::vector<TH1D*> MC_hist, std::vector<TH1D*> Fitted_hist, bool verbose);
 std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::string>& fileNames, std::vector<double> delays, bool verbose, std::string fitName = "");
-std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName = "");
-std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName = "");
-std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName = "");
+std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, std::string fitName = "");
+std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, std::string fitName = "");
+std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, std::string fitName = "");
 std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry);
+double get_Energy_Scaling(TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, double R, double Z);
 
 
 
@@ -284,6 +286,22 @@ std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::str
         exit(1);
     }
 
+    // Read in Iwan's energy correction histogram and compute constant needed to use it loop
+    // Read in root file
+    std::string E_corr_filename = "/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/escaling_data_mc_mc_out_NTUPLE_SEG_6000_xyznhits_erecon_tag_nhits_PartialScintBipo214_ScintRun_257635_264716.root";
+    TFile* fin = new TFile(E_corr_filename.c_str());
+    if (!fin->IsOpen()) {
+        std::cout << "Cannot open input file " << E_corr_filename << std::endl;
+        exit(1);
+    }
+    // Get histogram (Po used to calibrate alpha events. In this case for Energy scaling)
+    TH2F* alpha_scaling_hist = (TH2F*)fin->Get("h2_Po_scale_z_R");
+    // Get info
+    std::vector<unsigned int> Nbins = {(unsigned int)(alpha_scaling_hist->GetNbinsX()), (unsigned int)(alpha_scaling_hist->GetNbinsY())};
+    std::vector<double> Limits = {alpha_scaling_hist->GetXaxis()->GetBinCenter(1), alpha_scaling_hist->GetXaxis()->GetBinCenter(Nbins.at(0)),
+                                  alpha_scaling_hist->GetYaxis()->GetBinCenter(1), alpha_scaling_hist->GetYaxis()->GetBinCenter(Nbins.at(1))};
+
+    // Create output histograms we will get PDFs from
     std::vector<TH1D*> histograms;
     for (unsigned int i = 0; i < 3; ++i) {
         std::string hist_name = "hHitTimeResiduals_" + type + "_" + to_string(i);
@@ -312,9 +330,9 @@ std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::str
                 // Get indices of events that pass cuts
                 std::vector<std::vector<unsigned int>> passed_evt_indices_list;
                 if (verbose) {std::cout << "passed_evt_indices_list.size() = " << passed_evt_indices_list.size() << std::endl;}
-                passed_evt_indices_list.push_back(apply_cuts("alphaN_1", iEV, rDS, rEV, type, fitName));
-                passed_evt_indices_list.push_back(apply_cuts("alphaN_2", iEV, rDS, rEV, type, fitName));
-                passed_evt_indices_list.push_back(apply_cuts("alphaN_3", iEV, rDS, rEV, type, fitName));
+                passed_evt_indices_list.push_back(apply_cuts("alphaN_1", iEV, rDS, rEV, type, alpha_scaling_hist, Nbins, Limits, fitName));
+                passed_evt_indices_list.push_back(apply_cuts("alphaN_2", iEV, rDS, rEV, type, alpha_scaling_hist, Nbins, Limits, fitName));
+                passed_evt_indices_list.push_back(apply_cuts("alphaN_3", iEV, rDS, rEV, type, alpha_scaling_hist, Nbins, Limits, fitName));
                 // Add passed events to histograms
                 for (unsigned int j = 0; j < passed_evt_indices_list.size(); ++j) {
                     std::vector<unsigned int> passed_evt_indices = passed_evt_indices_list.at(j);
@@ -327,7 +345,7 @@ std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::str
                         TVector3 evt_pos;
                         double evt_time;
                         if (type == "recon") {
-                            std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, fitName);
+                            std::vector<double> evt_recon_info = getReconInfo(iEV, rDS, alpha_scaling_hist, Nbins, Limits, fitName);
                             evt_pos = TVector3(evt_recon_info.at(1), evt_recon_info.at(2), evt_recon_info.at(3));
                             evt_time = evt_recon_info.at(4);
                         } else {
@@ -375,18 +393,21 @@ std::vector<TH1D*> HitTimeResiduals(std::string type, const std::vector<std::str
  * @param cuts_name 
  * @param evt_idx 
  * @param entry 
- * @param evt 
- * @param info_type 
+ * @param evt
+ * @param info_type = 'true' or 'recon'
+ * @param alpha_scaling_hist Energy correction histogram (find bin matching R and Z, then multiply energy by the value in this bin).
+ * @param Nbins {Number of bins in x-direction (R), Number of bins in y-direction (Z)}, for alpha_scaling_hist.
+ * @param Limits {R_min, R_max, Z_min, Z_max}, from alpha_scaling_hist.
  * @param fitName 
  * @return std::vector<unsigned int> 
  */
-std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
+std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, std::string fitName) {
     if (info_type != "true" && info_type != "recon") {
         std::cout << "info_type should be 'true' or 'recon', not '" << info_type << "'." << std::endl;
         exit(1);
     }
     if (cuts_name == "alphaN_1" || cuts_name == "alphaN_2" || cuts_name == "alphaN_3") {
-        return alphaN_cuts(cuts_name, evt_idx, entry, evt, info_type, fitName);
+        return alphaN_cuts(cuts_name, evt_idx, entry, evt, info_type, alpha_scaling_hist, Nbins, Limits, fitName);
     } else {
         std::vector<unsigned int> automatic_pass = {evt_idx};
         return automatic_pass;
@@ -401,9 +422,14 @@ std::vector<unsigned int> apply_cuts(std::string cuts_name, unsigned int evt_idx
  * @param evt_idx 
  * @param entry 
  * @param evt 
+ * @param info_type = 'true' or 'recon'
+ * @param alpha_scaling_hist Energy correction histogram (find bin matching R and Z, then multiply energy by the value in this bin).
+ * @param Nbins {Number of bins in x-direction (R), Number of bins in y-direction (Z)}, for alpha_scaling_hist.
+ * @param Limits {R_min, R_max, Z_min, Z_max}, from alpha_scaling_hist.
+ * @param fitName 
  * @return std::vector<unsigned int> 
  */
-std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, std::string fitName) {
+std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_idx, const RAT::DS::Entry& entry, const RAT::DS::EV& evt, std::string info_type, TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, std::string fitName) {
     std::vector<unsigned int> passed_evt_indices;
 
     // Only pass the prompt event if this is the delayed event, so we know it has a delayed event
@@ -416,7 +442,7 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
         double prompt_time = prompt_evt.GetClockCount50() * 20.0;  // nanoseconds
         std::vector<double> prompt_info;
         if (info_type == "recon") {
-            prompt_info =  getReconInfo(0, entry, fitName);
+            prompt_info =  getReconInfo(0, entry, alpha_scaling_hist, Nbins, Limits, fitName);
         } else {
             prompt_info =  getMCInfo(0, entry);  // FIXME: Add energy to event energy if e+? 1.02MeV
         }
@@ -430,7 +456,7 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
         double delayed_time = evt.GetClockCount50() * 20.0;  // nanoseconds
         std::vector<double> delayed_info;
         if (info_type == "recon") {
-            delayed_info =  getReconInfo(evt_idx, entry, fitName);
+            delayed_info =  getReconInfo(evt_idx, entry, alpha_scaling_hist, Nbins, Limits, fitName);
         } else {
             delayed_info =  getMCInfo(evt_idx, entry);  // FIXME: Add energy to event energy if e+? 1.02MeV
         }
@@ -496,21 +522,32 @@ std::vector<unsigned int> alphaN_cuts(std::string cuts_name, unsigned int evt_id
  * @brief Get the reconstructed energy and position of an event as {E, x, y, z, t}.
  * If error in reconstruction, returns empty vector.
  * 
- * @param evt 
+ * @param evt_idx 
+ * @param entry 
+ * @param alpha_scaling_hist Energy correction histogram (find bin matching R and Z, then multiply energy by the value in this bin).
+ * @param Nbins {Number of bins in x-direction (R), Number of bins in y-direction (Z)}, for alpha_scaling_hist.
+ * @param Limits {R_min, R_max, Z_min, Z_max}, from alpha_scaling_hist.
+ * @param fitName 
  * @return std::vector<double> 
  */
-std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, std::string fitName) {
+std::vector<double> getReconInfo(unsigned int evt_idx, const RAT::DS::Entry& entry, TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, std::string fitName) {
     const RAT::DS::EV& evt = entry.GetEV(evt_idx);
     std::vector<double> output_vector;
     // grab the fit information
     if(fitName == "")
         fitName = evt.GetDefaultFitName();
     try {
+        // Get recon info
         const RAT::DS::FitVertex& rVertex = evt.GetFitResult(fitName).GetVertex(0);
         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {return output_vector;} // fit invalid
         double energy = rVertex.GetEnergy();
         TVector3 pos = rVertex.GetPosition();
         double time = rVertex.GetTime();
+
+        // Apply energy scaling (Iwan's energy scaling for partial-fill)
+        energy *= get_Energy_Scaling(alpha_scaling_hist, Nbins, Limits, pos.Mag(), pos.Z());
+
+        // Package info 
         output_vector = {energy, pos.X(), pos.Y(), pos.Z(), time};
     }
     catch (const RAT::DS::FitCollection::NoResultError&) {return output_vector;} // no fit result by the name of fitName
@@ -537,3 +574,45 @@ std::vector<double> getMCInfo(unsigned int evt_idx, const RAT::DS::Entry& entry)
     std::vector<double> output_vector = {energy, pos.X(), pos.Y(), pos.Z(), time};
     return output_vector;
 }
+
+
+
+/* ~~~~~~~~~~~~~~~~~~~~~~ ENERGY SCALING ~~~~~~~~~~~~~~~~~~~~~ */
+
+
+/**
+ * @brief Get the Energy Scaling factor from Iwan's energy correction, for partial-fill
+ * 
+ * @param alpha_scaling_hist Energy correction histogram (find bin matching R and Z, then multiply energy by the value in this bin).
+ * @param Nbins {Number of bins in x-direction (R), Number of bins in y-direction (Z)}, for alpha_scaling_hist.
+ * @param Limits {R_min, R_max, Z_min, Z_max}, from alpha_scaling_hist.
+ * @param R Distance of event from the AV centre.
+ * @param Z Projection of distance of event from the AV centre onto the Z-axis.
+ * @return double 
+ */
+double get_Energy_Scaling(TH2F* alpha_scaling_hist, const std::vector<unsigned int>& Nbins, const std::vector<double>& Limits, double R, double Z) {
+    // Unpack values
+    unsigned int NbinsR = Nbins.at(0);
+    unsigned int NbinsZ = Nbins.at(1);
+    double R_min = Limits.at(0);
+    double R_max = Limits.at(1);
+    double Z_min = Limits.at(2);
+    double Z_max = Limits.at(3);
+
+    // Get x and y bin index from R and Z respectively
+    double ratio_R = (R - R_min) / (R_max - R_min);
+    unsigned int n_bins_R = (unsigned int)(ratio_R + 0.5 - (ratio_R < 0.0)); // Round ratio to nearest integer, since type cast always truncates
+    unsigned int R_idx = 1 + NbinsR * n_bins_R;
+
+    double ratio_Z = (Z - Z_min) / (Z_max - Z_min);
+    unsigned int n_bins_Z = (unsigned int)(ratio_Z + 0.5 - (ratio_Z < 0.0)); // Round ratio to nearest integer, since type cast always truncates
+    unsigned int Z_idx = 1 + NbinsZ * n_bins_Z;
+
+    return alpha_scaling_hist->GetBinContent(R_idx, Z_idx);
+}
+
+
+// bin = 0;       underflow bin
+// bin = 1;       first bin with low-edge xlow INCLUDED
+// bin = nbins;   last bin with upper-edge xup EXCLUDED
+// bin = nbins+1; overflow bin
