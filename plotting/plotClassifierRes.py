@@ -118,7 +118,7 @@ def alphaN13C_Cuts(data, new_data):
             #print('prompt_radius:', prompt_radius, 'delayed_radius:', delayed_radius)
             if prompt_radius > 5700 or delayed_radius > 5700:  # in mm
                 continue
-            if abs(delayed_radius - prompt_radius) > 1500:  # in mm
+            if abs(delayed_radius - prompt_radius) > 1500:  # in mm  FIXME
                 continue
             if delayed_time < 400 or delayed_time > 0.8E6:  # in ns
                 continue
@@ -165,6 +165,8 @@ def applyCuts_new(data, energy_lim):
 
         for key in new_data[particle]:
             new_data[particle][key] = np.array(new_data[particle][key])
+            print('N_data[' + particle + '][' + cut_simEnergies[0] + '][' + key + '] =', len(data[particle][cut_simEnergies[0]][key]))
+            print('N_data_cut[' + particle + '][' + cut_simEnergies[0] + '][' + key + '] =', len(new_data[particle][key]))
 
     return new_data, full_nhits
 
