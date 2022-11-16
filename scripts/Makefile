@@ -10,6 +10,9 @@ getPDF.exe: getPDF.cpp
 
 ClassifierResults.exe: ClassifierResults.cpp
 	g++ -g -std=c++1y ClassifierResults.cpp -o ClassifierResults.exe ${RAT_CONFIG}
+
+get_evt_info.exe: get_evt_info.cpp
+	g++ -g -std=c++1y get_evt_info.cpp -o get_evt_info.exe ${RAT_CONFIG}
 	
 clean :
 	rm *.exe
