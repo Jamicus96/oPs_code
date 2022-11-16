@@ -42,7 +42,7 @@
 
 void print_info_to_file(const std::vector<std::string>& fileNames, const std::string output_file_address, bool verbose, std::string fitName="");
 std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& evt, unsigned int evt_idx, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim);
-std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim, std::string fitname);
+std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim, std::string fitName);
 
 
 
@@ -107,13 +107,6 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
     double upper_lim = 999.5;
     // Print these to first line of file
     output_file << Nbins << ", " << lower_lim << ", " <<  upper_lim << std::endl;
-    // Create output histograms we will get PDFs from
-    std::vector<TH1D*> histograms;
-    for (unsigned int i = 0; i < 3; ++i) {
-        std::string hist_name = "hHitTimeResiduals_" + type + "_" + to_string(i);
-        std::string hist_title = "Hit time residuals using the " + type + " position" + ", " + to_string(i);
-        histograms.push_back(new TH1D(hist_name.c_str(), hist_title.c_str(), 1300, -300.5, 999.5));
-    }
 
     RAT::DB::Get()->SetAirplaneModeStatus(true);
     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
@@ -154,7 +147,7 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
                 output_file << info_MC.at(info_MC.size() - 1) << std::endl;
 
                 // Get recon info, and (if it exists) print to file
-                std::vector<double> info_recon = get_recon_info(rEV, fTRCalc, Nbins, lower_lim, upper_lim, fitname);
+                std::vector<double> info_recon = get_recon_info(rEV, fTRCalc, Nbins, lower_lim, upper_lim, fitName);
                 if (info_recon.size() > 0) {
                     output_file << "recon:" << std::endl;
                     output_file << "E:" << info_recon.at(0) << std::endl;
@@ -206,7 +199,7 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
     for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
         const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
         // Use new time residual calculator
-        hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, evt_pos, evt_time));
+        hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, time));
     }
 
     // Now loop through histogram bins, and save entries in output vector
@@ -231,11 +224,11 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
  * @return std::vector<double> 
  */
 std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins,
-                                    double lower_lim, double upper_lim, std::string fitname) {
+                                    double lower_lim, double upper_lim, std::string fitName) {
 
     // Get event info (grab the fit information)
-    std::vector<double> output = {}
-    if(fitName == "")
+    std::vector<double> output = {};
+    if (fitName == "")
         fitName = evt.GetDefaultFitName();
     try {
         // Get recon info
@@ -247,25 +240,25 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
 
         // Package info 
         output = {energy, pos.X(), pos.Y(), pos.Z(), time};
+
+        // calculate time residuals (loop through PMTs) and dump them in a histogram
+        const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
+        TH1D* hist = new TH1D("name", "title", Nbins, lower_lim, upper_lim);
+        for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+            const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
+            // Use new time residual calculator
+            hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, time));
+        }
+
+        // Now loop through histogram bins, and save entries in output vector
+        unsigned int N_bins = hist->GetNbinsX();
+        for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
+            output.push_back(hist->GetBinContent(i));
+        }
     }
     catch (const RAT::DS::FitCollection::NoResultError&) {return output;} // no fit result by the name of fitName
     catch (const RAT::DS::FitResult::NoVertexError&) {return output;} // no fit vertex
     catch (const RAT::DS::FitVertex::NoValueError&) {return output;} // position or time missing
-
-    // calculate time residuals (loop through PMTs) and dump them in a histogram
-    const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
-    TH1D* hist = new TH1D("name", "title", Nbins, lower_lim, upper_lim);
-    for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-        const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-        // Use new time residual calculator
-        hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, evt_pos, evt_time));
-    }
-
-    // Now loop through histogram bins, and save entries in output vector
-    unsigned int N_bins = hist->GetNbinsX();
-    for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
-        output.push_back(hist->GetBinContent(i));
-    }
 
     return output;
 }
