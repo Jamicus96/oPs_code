@@ -115,6 +115,7 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
     /*********** Loop through all files, entries, events, and PMTs ***********/
     // loops through files
     unsigned int entry_num = 0;
+    ULong64_t previous_50MHz_time = 0;
     for (unsigned int i = 0; i < fileNames.size(); ++i) {
         RAT::DU::DSReader dsReader(fileNames.at(i));
         fTRCalc.BeginOfRun();  // Re-initialize time residual calculator (light-path calculator) after it gets geo info from DSReader
@@ -124,42 +125,47 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
         for (size_t iEntry = 0; iEntry < dsReader.GetEntryCount(); ++iEntry) {
             if (verbose) {std::cout << "iEntry = " << iEntry << std::endl;}
             const RAT::DS::Entry& rDS = dsReader.GetEntry(iEntry);
-            output_file << "entry:" << entry_num << std::endl;
-            ++entry_num;
 
             // loops through events
+            previous_50MHz_time = 0;
             for (size_t iEV = 0; iEV < rDS.GetEVCount(); ++iEV) {
                 if (verbose) {std::cout << "iEV = " << iEV << std::endl;}
                 const RAT::DS::EV& rEV = rDS.GetEV(iEV);
-                output_file << "evt:" << iEV << std::endl;
 
-                // Get MC info, print it to file
-                std::vector<double> info_MC = get_MC_info(rDS, rEV, iEV, fTRCalc, Nbins, lower_lim, upper_lim);
-                output_file << "MC:" << std::endl;
-                output_file << "KE:" << info_MC.at(0) << std::endl;
-                output_file << "PDG:" << info_MC.at(1) << std::endl;
-                output_file << "pos:" << info_MC.at(2) << "," << info_MC.at(3) << "," << info_MC.at(4) << std::endl;
-                output_file << "time:" << info_MC.at(5) << std::endl;
-                output_file << "t_res:";
-                for (unsigned int j = 6; j < (info_MC.size() - 1); ++j) {
-                    output_file << info_MC.at(j) << ",";
+                double Delta_T = 0.0;
+                if (previous_50MHz_time == 0) {
+                    previous_50MHz_time = rEV.GetClockCount50();
+                } else {
+                    // Compute Delta_T in ns (from last event in entry). The "& 0x7FFFFFFFFFF" just removes the sign
+                    // (so we get the absolute value), by doing a bitwise comparison with the largest 8-bit integer
+                    Delta_T = ((int64_t(rEV.GetClockCount50()) - int64_t(previous_50MHz_time)) & 0x7FFFFFFFFFF) * 20.0;
                 }
-                output_file << info_MC.at(info_MC.size() - 1) << std::endl;
+
+                // Get MC info, and (if it exists) print to file
+                std::vector<double> info_MC = get_MC_info(rDS, rEV, iEV, fTRCalc, Nbins, lower_lim, upper_lim);
+                if (info_MC.size() > 0) {
+                    output_file  << "MC " << entry_num << " " << iEV << " " << info_MC.at(0) << " "
+                    << info_MC.at(1) << " " << info_MC.at(2) << "," << info_MC.at(3) << "," << info_MC.at(4)
+                    << " " << Delta_T << " "; // MC entry evt KE PDG x,y,z Delta_t t_res_1,t_res_2,...,t_res_n
+                    for (unsigned int j = 6; j < (info_MC.size() - 1); ++j) {
+                        output_file << info_MC.at(j) << ",";
+                    }
+                    output_file << info_MC.at(info_MC.size() - 1) << std::endl;
+                }
 
                 // Get recon info, and (if it exists) print to file
                 std::vector<double> info_recon = get_recon_info(rEV, fTRCalc, Nbins, lower_lim, upper_lim, fitName);
                 if (info_recon.size() > 0) {
-                    output_file << "recon:" << std::endl;
-                    output_file << "E:" << info_recon.at(0) << std::endl;
-                    output_file << "pos:" << info_recon.at(1) << "," << info_recon.at(2) << "," << info_recon.at(3) << std::endl;
-                    output_file << "time:" << info_recon.at(4) << std::endl;
-                    output_file << "t_res:";
+                    output_file  << "recon " << entry_num << " " << iEV << " " << info_recon.at(0) << " "
+                    << info_recon.at(1) << "," << info_recon.at(2) << "," << info_recon.at(3)
+                    << " " << Delta_T << " "; // MC entry evt E x,y,z Delta_T t_res_1,t_res_2,...,t_res_n
                     for (unsigned int j = 5; j < (info_recon.size() - 1); ++j) {
                         output_file << info_recon.at(j) << ",";
                     }
                     output_file << info_recon.at(info_recon.size() - 1) << std::endl;
                 }
             }
+            ++entry_num;
         }
         dsReader.Delete();
     }
@@ -184,28 +190,32 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
 std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& evt, unsigned int evt_idx,
                                 RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim) {
 
-    // Get event info
-    double KE = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
-    double PDG_code = entry.GetMC().GetMCParticle(evt_idx).GetPDGCode();
-    TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
-    double time = 390 - entry.GetMCEV(evt_idx).GetGTTime();  // event time is 390ns - GT time.
+    std::vector<double> output;
+    if (evt_idx < entry.GetMC().GetMCParticleCount()) {
+        // Get event info
+        double KE = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
+        double PDG_code = entry.GetMC().GetMCParticle(evt_idx).GetPDGCode();
+        TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
+        double GT_time = 390 - entry.GetMCEV(evt_idx).GetGTTime();  // event time is 390ns - GT time.
 
-    // Create output vector, with general event info first
-    std::vector<double> output = {KE, PDG_code, pos.X(), pos.Y(), pos.Z(), time};
+        // Package output info
+        output = {KE, PDG_code, pos.X(), pos.Y(), pos.Z()};
 
-    // calculate time residuals (loop through PMTs) and dump them in a histogram
-    const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
-    TH1D* hist = new TH1D("name", "title", Nbins, lower_lim, upper_lim);
-    for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-        const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-        // Use new time residual calculator
-        hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, time));
-    }
+        // calculate time residuals (loop through PMTs) and dump them in a histogram
+        const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
+        TH1D* hist = new TH1D("name", "title", Nbins, lower_lim, upper_lim);
+        for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+            const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
+            // Use new time residual calculator
+            hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, GT_time));
+        }
 
-    // Now loop through histogram bins, and save entries in output vector
-    unsigned int N_bins = hist->GetNbinsX();
-    for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
-        output.push_back(hist->GetBinContent(i));
+        // Now loop through histogram bins, and save entries in output vector
+        unsigned int N_bins = hist->GetNbinsX();
+        for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
+            output.push_back(hist->GetBinContent(i));
+        }
+        delete hist;
     }
 
     return output;
@@ -227,7 +237,7 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
                                     double lower_lim, double upper_lim, std::string fitName) {
 
     // Get event info (grab the fit information)
-    std::vector<double> output = {};
+    std::vector<double> output;
     if (fitName == "")
         fitName = evt.GetDefaultFitName();
     try {
@@ -236,10 +246,10 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {return output;} // fit invalid
         double energy = rVertex.GetEnergy();
         TVector3 pos = rVertex.GetPosition();
-        double time = rVertex.GetTime();
+        double vertex_time = rVertex.GetTime();
 
-        // Package info 
-        output = {energy, pos.X(), pos.Y(), pos.Z(), time};
+        // Package info
+        output = {energy, pos.X(), pos.Y(), pos.Z()};
 
         // calculate time residuals (loop through PMTs) and dump them in a histogram
         const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
@@ -247,7 +257,7 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
             const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
             // Use new time residual calculator
-            hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, time));
+            hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, vertex_time));
         }
 
         // Now loop through histogram bins, and save entries in output vector
@@ -255,6 +265,7 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
             output.push_back(hist->GetBinContent(i));
         }
+        delete hist;
     }
     catch (const RAT::DS::FitCollection::NoResultError&) {return output;} // no fit result by the name of fitName
     catch (const RAT::DS::FitResult::NoVertexError&) {return output;} // no fit vertex

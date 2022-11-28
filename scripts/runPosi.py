@@ -20,15 +20,15 @@ def argparser():
                         1.0 and 2.0 MeV, and 5.0 and 6.0 MeV')
 
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/macros/', help='Folder to save Region-selected root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--pdf_repo', '-pr', type=str, dest='pdf_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/PDFs/', help='Folder to save PDF text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/PDFs/', help='Folder to save PDF text files in.')
     parser.add_argument('--class_repo', '-cr', type=str, dest='class_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/Classifications/', help='Folder to save Classifier result text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/Classifications/', help='Folder to save Classifier result text files in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/info/', help='Folder to save info text files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
@@ -114,7 +114,7 @@ def job_str_map(jobName_str, particle, energies):
             'IBD': 'ib',
             'alphaN13C': 'ac',
             'alphaN18O': 'ao',
-            'partial_alphaN13C': 'pa'
+            'partial_alphaN13C': 'pa',
             'partial_IBD': 'pi'
         }
     }

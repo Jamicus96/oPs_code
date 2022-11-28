@@ -1,0 +1,84 @@
+#
+#
+#       Macro for simulating events using nCapture vertex generator in AV, inner side (fill shell)
+#
+#       Taken from: rat/mac/run-by-run-production/partialfitter_0p5labppo/partialfill/AlphaN_LAB_13C.mac
+#       Removed datacleaning.
+#       No run dependence of noise.
+#       Added o-Ps line.
+#       Added tracking, and update 10.
+
+# Don't care about hadrons or muons so quicker not to initialise these processes
+/rat/physics_list/OmitMuonicProcesses true
+
+/rat/db/set DETECTOR geo_file "geo/snoplus_partial.geo"
+/rat/db/set GEO[inner_av] split_z 750   # NEW
+/rat/db/set GEO[inner_av] material_top "labppo_0p5_scintillator" # Measured 0.53 g/L PPO
+/rat/db/set OPTICS[labppo_0p5_scintillator] ABSLENGTH_SCALING [1.0,4.0,] # Use the abslength scaling value that was used to tune the partialfill optics
+
+# Set o-Ps values
+#/rat/db/set POSITRONIUM formfrac 0.0   # NEW
+
+# store tracking info except certain particles
+/rat/tracking/store full   # NEW
+/rat/tracking/omit opticalphoton   # NEW
+/rat/tracking/omit e-   # NEW
+
+#To simulate noise using the per-pmt rates:
+/rat/db/set NOISE_MC noise_flag 2
+#To read the per-pmt noise rates from the NOISE_RUN_INTEGRATED table:
+/rat/db/set NOISE_MC integ_noise_flag 1
+
+## MC cutoff parameters
+/rat/db/set MC event_cutoff_time 1e9
+/rat/db/set MC event_cutoff_nstep 1000
+
+/run/initialize
+
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
+/rat/proc count  # NEW
+/rat/procset update 10  # NEW
+
+# /rat/proc datacleaning
+# /rat/procset index "scintillator"
+# /rat/procset mask "default_apply"
+
+# Apply same reconstruction logic as the processed data
+/rat/proc/if trigTypeSelector
+  # We do not want to process events with the PED trigger - ie the Nhit monitor
+  # Additionally, EXTA events are from optical calibration sources. Don't reconstruct.
+  /rat/procset trigType "Pedestal"
+  /rat/procset trigType "EXTASY"
+
+/rat/proc/else
+
+/rat/proc classifier
+/rat/procset classifier "skyshine"
+/rat/procset name "skyshine"
+
+/rat/proc fitter
+/rat/procset method "fastZ"
+/rat/procset name "fastZ"
+
+/rat/proc partialFitter
+
+/rat/proc/endif           # not ped and EXTASY events
+
+# /rat/proc outntuple
+# #Prune events and write all of them to DS
+# /rat/proc prune
+# /rat/procset prune "mc.pmts,mc.hits,mcevs,ev.uncalPMTs,ev.intermedCalPMTs"
+/rat/proclast outroot
+
+##########EVENT LOOP############
+/generator/add combo alpha_n:fill:poisson
+/generator/vtx/set LAB 13C
+/generator/pos/set inner_av_top
+/generator/rate/set 1.0
+
+/rat/run/start
+exit
