@@ -12,7 +12,7 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--particle', '-p', type=str, dest='particle',
-                        default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma', 'alpha', 'IBD', 'alphaN13C', 'alphaN18O'],
+                        default='o-Ps', choices=['o-Ps', 'e+', 'e-', 'gamma', 'alpha', 'IBD', 'alphaN13C', 'alphaN18O', 'partial_alphaN13C', 'partial_IBD'],
                         help='Which particle to simulate')
     parser.add_argument('--energies', '-e', type=str, dest='energies',
                         default='[0.5,9.0]', help='List of particle energy ranges to simulate (MeV).\n\
@@ -20,21 +20,23 @@ def argparser():
                         1.0 and 2.0 MeV, and 5.0 and 6.0 MeV')
 
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/macros/', help='Folder to save Region-selected root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--pdf_repo', '-pr', type=str, dest='pdf_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/PDFs/', help='Folder to save PDF text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/PDFs/', help='Folder to save PDF text files in.')
     parser.add_argument('--class_repo', '-cr', type=str, dest='class_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/spectra/Classifications/', help='Folder to save Classifier result text files in.')
-
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/Classifications/', help='Folder to save Classifier result text files in.')
+    parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_with_oPs/info/', help='Folder to save info text files in.')
+    
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf', 'class'],
+    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf', 'class', 'info'],
                         help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')
@@ -47,7 +49,7 @@ def argparser():
 
 def getRepoAddress():
     '''Returns the full address of the git repo containing with script'''
-    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+    repo_address = __file__[:-len('scripts/runPosi.py')]
     if repo_address == '':
         firt_char = None
     else:
@@ -100,7 +102,8 @@ def job_str_map(jobName_str, particle, energies):
         'job_type': {
             'sims_': 'S',
             'pdf_': 'P',
-            'class_': 'C'
+            'class_': 'C',
+            'info_': 'I'
         },
         'particle': {
             'o-Ps': 'oP',
@@ -110,7 +113,9 @@ def job_str_map(jobName_str, particle, energies):
             'alpha': 'al',
             'IBD': 'ib',
             'alphaN13C': 'ac',
-            'alphaN18O': 'ao'
+            'alphaN18O': 'ao',
+            'partial_alphaN13C': 'pa'
+            'partial_IBD': 'pi'
         }
     }
 
@@ -215,12 +220,11 @@ def getEnergyRanges(energies_str):
 
 ### SIMS FUNCTIONS ###
 
-def makeMacros(particle, energies, example_macro, save_macro_folder, save_sims_folder, n_evts, idx):
+def makeMacros(particle, energies, example_macro, save_macro_folder):
     '''Make and save macro according to provided parameters'''
 
     # AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
-    new_macro_address = save_macro_folder + 'macro_' + filename_format(particle, energies) + '_' + str(idx) + '.mac'
-    output_address = save_sims_folder + 'simOut_' + filename_format(particle, energies) + '_' + str(idx) + '.root'
+    new_macro_address = save_macro_folder + 'macro_' + filename_format(particle, energies) + '.mac'
 
     new_macro = []
     for line in example_macro:
@@ -230,7 +234,7 @@ def makeMacros(particle, energies, example_macro, save_macro_folder, save_sims_f
         elif ('/rat/tracking/omit e-' in line) and (particle == 'e-'):
             new_line = line.replace('/rat/tracking/omit e-', '')
         elif '/rat/procset file "oPs_output.root"' in line:
-            new_line = line.replace('oPs_output.root', output_address)
+            new_line = line.replace('/rat/procset file "oPs_output.root"', '#/rat/procset file "oPs_output.root"')  # Will set with run-time argument
         elif '/generator/vtx/set e+ 0 0 0 0 0.5 9.0' in line:
             if particle == 'o-Ps':
                 new_line = line
@@ -239,7 +243,7 @@ def makeMacros(particle, energies, example_macro, save_macro_folder, save_sims_f
             new_line = new_line.replace('0.5', str(energies[0]))
             new_line = new_line.replace('9.0', str(energies[1]))
         elif '/rat/run/start 1000' in line:
-            new_line = line.replace('1000', str(n_evts))
+            new_line = line.replace('/rat/run/start 1000', '#/rat/run/start 1000')  # Will set with run-time argument
         else:
             new_line = line
 
@@ -265,6 +269,10 @@ def runSims(args):
         example_macro_address = repo_address + 'macros/alphaN_13C.mac'
     elif args.particle == 'alphaN18O':
         example_macro_address = repo_address + 'macros/alphaN_18O.mac'
+    elif args.particle == 'partial_alphaN13C':
+        example_macro_address = repo_address + 'macros/partial_fill_alphaN_13C.mac'
+    elif args.particle == 'partial_IBD':
+        example_macro_address = repo_address + 'macros/partial_fill_IBD.mac'
     else:
         example_macro_address = repo_address + 'macros/Sim_oPs.mac'
     with open(example_macro_address, "r") as f:
@@ -295,11 +303,13 @@ def runSims(args):
         # Make list of commands for job array to call
         commandList_address = jobScript_repo + 'sim_commandList_' + filename_format(args.particle, energies) + '.txt'
         commandList_file = open(commandList_address, 'w')
+        # Create macro
+        macro_address = makeMacros(args.particle, energies, example_macro, save_macro_folder)
         for i in range(len(n_evts)):
-            # Create all the macros
-            macro_address = makeMacros(args.particle, energies, example_macro, save_macro_folder, save_sims_folder, n_evts[i], i)
+            # Create all the commands to run the macro
+            outroot_address = save_sims_folder + 'simOut_' + filename_format(args.particle, energies) + '_' + str(i) + '.root'
             log_file_address = save_macro_folder + 'log_files/ratLog_' + filename_format(args.particle, energies) + '.log'
-            macro_command = 'rat -P ' + macro_address + ' -l ' + log_file_address
+            macro_command = 'rat -P ' + macro_address + ' -N ' + str(n_evts[i]) + ' -o ' + outroot_address + ' -l ' + log_file_address
             if args.verbose:
                 macro_command += ' -vv'
             commandList_file.write(macro_command + '\n')
@@ -352,10 +362,10 @@ def getPDF(args):
         output_file = save_pdf_folder + 'PDFs_' + filename_format(args.particle, energies) + '.txt'
 
         command = command_base + output_file
-        if args.particle == 'o-Ps':
-            command += ' ' + str(1)
-        else:
-            command += ' ' + str(0)
+        # if args.particle == 'o-Ps':
+        #     command += ' ' + str(1)
+        # else:
+        #     command += ' ' + str(0)
         command += ' ' + str(int(args.verbose))
 
         sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.particle, energies)
@@ -436,6 +446,62 @@ def getClassification(args):
 
     return True
 
+def getInfo(args):
+    '''Get info from simulaltion output and print everything to text file'''
+    print('Running getInfo().')
+
+    # Read in example macro and job script + info
+    repo_address = getRepoAddress()
+
+    # Make sure folders are of the correct format to  use later
+    save_sims_folder = checkRepo(args.sim_repo, args.verbose)
+    save_info_folder = checkRepo(args.info_repo, args.verbose)
+
+    # Get example job script
+    example_jobScript_address = repo_address + 'job_scripts/jobSingle.job'
+    with open(example_jobScript_address, "r") as f:
+        example_jobScript = f.readlines()
+
+    # How simulations were split up
+    n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
+
+    # Convert energies string to more usable list
+    energies_list = getEnergyRanges(args.energies)
+
+    ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
+    print('Creating analysis job scripts...')
+    jobScript_addresses = []
+    command_base = repo_address + 'scripts/get_evt_info.exe '
+    for energies in energies_list:
+        output_file = save_info_folder + 'info_' + filename_format(args.particle, energies) + '.txt'
+
+        command = command_base + output_file
+        # if args.particle == 'o-Ps':
+        #     command += ' ' + str(1)
+        # else:
+        #     command += ' ' + str(0)
+        command += ' ' + str(int(args.verbose))
+
+        sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.particle, energies)
+        for i in range(len(n_evts)):
+            command += ' ' + sim_file_format + '_' + str(i) + '.root'
+
+        new_job_address = makeJobSingleScript('info_', example_jobScript, save_sims_folder, command, args.particle, energies, args.verbose)
+        jobScript_addresses.append(new_job_address)
+
+    # Wait until previous jobs are done
+    checkJobsDone('sims_', args.particle, energies_list, 10, args.verbose)
+
+    ### RUN JOB SCRIPTS ###
+    print('Submitting job(s)...')
+    for job_address in jobScript_addresses:
+        # For higher energies, the jobs need more memory, otherwise they get killed
+        command = 'qsub -l m_mem_free=4G ' + job_address
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
 
 ### MAIN ###
 
@@ -446,7 +512,8 @@ def main():
     work_modes = {
         'sim': runSims,
         'pdf': getPDF,
-        'class': getClassification
+        'class': getClassification,
+        'info': getInfo
     }
 
     result = work_modes[args.step](args)
