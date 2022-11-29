@@ -144,9 +144,9 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
                 // Get MC info, and (if it exists) print to file
                 std::vector<double> info_MC = get_MC_info(rDS, rEV, iEV, fTRCalc, Nbins, lower_lim, upper_lim);
                 if (info_MC.size() > 0) {
-                    output_file  << "MC " << entry_num << " " << iEV << " " << info_MC.at(0) << " "
-                    << info_MC.at(1) << " " << info_MC.at(2) << "," << info_MC.at(3) << "," << info_MC.at(4)
-                    << " " << Delta_T << " "; // MC entry evt KE PDG x,y,z Delta_t t_res_1,t_res_2,...,t_res_n
+                    output_file  << "MC " << entry_num << " " << iEV << " " << info_MC.at(0) << " " << info_MC.at(1) << " "
+                    << info_MC.at(2) << " " << info_MC.at(3) << "," << info_MC.at(4) << "," << info_MC.at(5)
+                    << " " << Delta_T << " "; // MC entry evt alphaN_classifier_result KE PDG x,y,z Delta_t t_res_1,t_res_2,...,t_res_n
                     for (unsigned int j = 6; j < (info_MC.size() - 1); ++j) {
                         output_file << info_MC.at(j) << ",";
                     }
@@ -157,8 +157,8 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
                 std::vector<double> info_recon = get_recon_info(rEV, fTRCalc, Nbins, lower_lim, upper_lim, fitName);
                 if (info_recon.size() > 0) {
                     output_file  << "recon " << entry_num << " " << iEV << " " << info_recon.at(0) << " "
-                    << info_recon.at(1) << "," << info_recon.at(2) << "," << info_recon.at(3)
-                    << " " << Delta_T << " "; // MC entry evt E x,y,z Delta_T t_res_1,t_res_2,...,t_res_n
+                    << info_recon.at(1) << " " << info_recon.at(2) << "," << info_recon.at(3) << "," << info_recon.at(4)
+                    << " " << Delta_T << " "; // MC entry evt alphaN_classifier_result E x,y,z Delta_T t_res_1,t_res_2,...,t_res_n
                     for (unsigned int j = 5; j < (info_recon.size() - 1); ++j) {
                         output_file << info_recon.at(j) << ",";
                     }
@@ -176,7 +176,7 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
 
 /**
  * @brief Returns vector of MC info for event (including entries of bins from time residual histogram):
- * {KE, PDG, x, y, z, time, t_res_0, t_res_1, ..., t_res_n}
+ * {alphaN_classifier_result, KE, PDG, x, y, z, t_res_0, t_res_1, ..., t_res_n}
  * 
  * @param entry 
  * @param evt 
@@ -196,34 +196,49 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
         double KE = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
         double PDG_code = entry.GetMC().GetMCParticle(evt_idx).GetPDGCode();
         TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
-        double GT_time = 390 - entry.GetMCEV(evt_idx).GetGTTime();  // event time is 390ns - GT time.
 
-        // Package output info
-        output = {KE, PDG_code, pos.X(), pos.Y(), pos.Z()};
+        try {
+            // Get classifier info
+            if (!evt.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
+                std::cout << "No AlphaNReactorIBDClassifier results." << iEntry << std::endl;
+                return output;
+            }
+            if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
+                std::cout << "No valid AlphaNReactorIBDClassifier result." << iEntry << std::endl;
+                return output;
+            }
+            RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
+            double alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
 
-        // calculate time residuals (loop through PMTs) and dump them in a histogram
-        const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
-        TH1D* hist = new TH1D("name", "title", Nbins, lower_lim, upper_lim);
-        for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
-            const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
-            // Use new time residual calculator
-            hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, GT_time));
+            // Package output info
+            output = {alphaNreactor_classier_result, KE, PDG_code, pos.X(), pos.Y(), pos.Z()};
+
+            // calculate time residuals (loop through PMTs) and dump them in a histogram
+            const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
+            TH1D* hist = new TH1D("name", "title", Nbins, lower_lim, upper_lim);
+            for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); iPMT++) {
+                const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
+                // Use new time residual calculator
+                hist->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, GT_time));
+            }
+
+            // Now loop through histogram bins, and save entries in output vector
+            unsigned int N_bins = hist->GetNbinsX();
+            for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
+                output.push_back(hist->GetBinContent(i));
+            }
+            delete hist;
         }
-
-        // Now loop through histogram bins, and save entries in output vector
-        unsigned int N_bins = hist->GetNbinsX();
-        for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
-            output.push_back(hist->GetBinContent(i));
-        }
-        delete hist;
+        catch (const RAT::DS::ClassifierResult::NoClassificationError&) {return output;} // classifier result error
     }
+
 
     return output;
 }
 
 /**
  * @brief Returns vector of recon info for event (including entries of bins from time residual histogram):
- * {E, x, y, z, time, t_res_0, t_res_1, ..., t_res_n}
+ * {alphaN_classifier_result, E, x, y, z, t_res_0, t_res_1, ..., t_res_n}
  * 
  * @param evt 
  * @param fTRCalc 
@@ -246,10 +261,21 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {return output;} // fit invalid
         double energy = rVertex.GetEnergy();
         TVector3 pos = rVertex.GetPosition();
-        double vertex_time = rVertex.GetTime();
+
+        // Get classifier info
+        if (!evt.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
+            std::cout << "No AlphaNReactorIBDClassifier results." << iEntry << std::endl;
+            return output;
+        }
+        if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
+            std::cout << "No valid AlphaNReactorIBDClassifier result." << iEntry << std::endl;
+            return output;
+        }
+        RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
+        double alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
 
         // Package info
-        output = {energy, pos.X(), pos.Y(), pos.Z()};
+        output = {alphaNreactor_classier_result, energy, pos.X(), pos.Y(), pos.Z()};
 
         // calculate time residuals (loop through PMTs) and dump them in a histogram
         const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
@@ -270,6 +296,7 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
     catch (const RAT::DS::FitCollection::NoResultError&) {return output;} // no fit result by the name of fitName
     catch (const RAT::DS::FitResult::NoVertexError&) {return output;} // no fit vertex
     catch (const RAT::DS::FitVertex::NoValueError&) {return output;} // position or time missing
+    catch (const RAT::DS::ClassifierResult::NoClassificationError&) {return output;} // classifier result error
 
     return output;
 }
