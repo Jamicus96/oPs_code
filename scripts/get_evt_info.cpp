@@ -196,15 +196,16 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
         double KE = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
         double PDG_code = entry.GetMC().GetMCParticle(evt_idx).GetPDGCode();
         TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
+        double GT_time = 390 - entry.GetMCEV(evt_idx).GetGTTime();  // event time is 390ns - GT time.
 
         try {
             // Get classifier info
             if (!evt.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
-                std::cout << "No AlphaNReactorIBDClassifier results." << iEntry << std::endl;
+                std::cout << "No AlphaNReactorIBDClassifier results." << std::endl;
                 return output;
             }
             if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
-                std::cout << "No valid AlphaNReactorIBDClassifier result." << iEntry << std::endl;
+                std::cout << "No valid AlphaNReactorIBDClassifier result." << std::endl;
                 return output;
             }
             RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
@@ -261,14 +262,15 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {return output;} // fit invalid
         double energy = rVertex.GetEnergy();
         TVector3 pos = rVertex.GetPosition();
+        double vertex_time = rVertex.GetTime();
 
         // Get classifier info
         if (!evt.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
-            std::cout << "No AlphaNReactorIBDClassifier results." << iEntry << std::endl;
+            std::cout << "No AlphaNReactorIBDClassifier results." << std::endl;
             return output;
         }
         if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
-            std::cout << "No valid AlphaNReactorIBDClassifier result." << iEntry << std::endl;
+            std::cout << "No valid AlphaNReactorIBDClassifier result." << std::endl;
             return output;
         }
         RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
