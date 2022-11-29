@@ -225,7 +225,7 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
 
             // Now loop through histogram bins, and save entries in output vector
             unsigned int N_bins = hist->GetNbinsX();
-            for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
+            for (unsigned int i = 0; i < N_bins+2; ++i) { // (first and last bins are overflow bins)
                 output.push_back(hist->GetBinContent(i));
             }
             delete hist;
@@ -290,7 +290,7 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
 
         // Now loop through histogram bins, and save entries in output vector
         unsigned int N_bins = hist->GetNbinsX();
-        for (unsigned int i = 0; i < N_bins+1; ++i) { // (first and last bins are overflow bins)
+        for (unsigned int i = 0; i < N_bins+2; ++i) { // (first (0) and last (nbins+1) bins are overflow bins)
             output.push_back(hist->GetBinContent(i));
         }
         delete hist;
