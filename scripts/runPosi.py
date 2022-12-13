@@ -20,15 +20,15 @@ def argparser():
                         1.0 and 2.0 MeV, and 5.0 and 6.0 MeV')
 
     parser.add_argument('--macro_repo', '-mr', type=str, dest='macro_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/macros/', help='Folder to save Region-selected root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--pdf_repo', '-pr', type=str, dest='pdf_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/PDFs/', help='Folder to save PDF text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/PDFs/', help='Folder to save PDF text files in.')
     parser.add_argument('--class_repo', '-cr', type=str, dest='class_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/Classifications/', help='Folder to save Classifier result text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/Classifications/', help='Folder to save Classifier result text files in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_0p5_scintillator/oldPDF_without_oPs/info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/info/', help='Folder to save info text files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
@@ -38,6 +38,8 @@ def argparser():
                         default=70, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'pdf', 'class', 'info'],
                         help='which step of the process is it in?')
+    parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=0,
+                        help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')
 
@@ -229,9 +231,7 @@ def makeMacros(particle, energies, example_macro, save_macro_folder):
     new_macro = []
     for line in example_macro:
         # Replace placeholders in macro
-        if ('/rat/db/set POSITRONIUM formfrac 1.0' in line) and (particle != 'o-Ps'):
-            new_line = line.replace('1.0', '0.0')
-        elif ('/rat/tracking/omit e-' in line) and (particle == 'e-'):
+        if ('/rat/tracking/omit e-' in line) and (particle == 'e-'):
             new_line = line.replace('/rat/tracking/omit e-', '')
         elif '/rat/procset file "oPs_output.root"' in line:
             new_line = line.replace('/rat/procset file "oPs_output.root"', '#/rat/procset file "oPs_output.root"')  # Will set with run-time argument
@@ -264,9 +264,9 @@ def runSims(args):
     repo_address = getRepoAddress()
 
     if args.particle == 'IBD':
-        example_macro_address = repo_address + 'macros/ReactorIBD.mac'
+        example_macro_address = repo_address + 'macros/2p2labppo/ReactorIBD.mac'
     elif args.particle == 'alphaN13C':
-        example_macro_address = repo_address + 'macros/alphaN_13C.mac'
+        example_macro_address = repo_address + 'macros/2p2labppo/alphaN_13C.mac'
     elif args.particle == 'alphaN18O':
         example_macro_address = repo_address + 'macros/alphaN_18O.mac'
     elif args.particle == 'partial_alphaN13C':
@@ -307,7 +307,7 @@ def runSims(args):
         macro_address = makeMacros(args.particle, energies, example_macro, save_macro_folder)
         for i in range(len(n_evts)):
             # Create all the commands to run the macro
-            outroot_address = save_sims_folder + 'simOut_' + filename_format(args.particle, energies) + '_' + str(i) + '.root'
+            outroot_address = save_sims_folder + 'simOut_' + filename_format(args.particle, energies) + '_' + str(args.start_fileNum + i) + '.root'
             log_file_address = save_macro_folder + 'log_files/ratLog_' + filename_format(args.particle, energies) + '.log'
             macro_command = 'rat -P ' + macro_address + ' -N ' + str(n_evts[i]) + ' -o ' + outroot_address + ' -l ' + log_file_address
             if args.verbose:
@@ -484,7 +484,7 @@ def getInfo(args):
 
         sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.particle, energies)
         for i in range(len(n_evts)):
-            command += ' ' + sim_file_format + '_' + str(i) + '.root'
+            command += ' ' + sim_file_format + '_' + str(args.start_fileNum + i) + '.root'
 
         new_job_address = makeJobSingleScript('info_', example_jobScript, save_sims_folder, command, args.particle, energies, args.verbose)
         jobScript_addresses.append(new_job_address)
