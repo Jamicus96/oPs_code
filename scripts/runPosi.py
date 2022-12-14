@@ -26,7 +26,7 @@ def argparser():
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'info'],
+    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info'],
                         help='which step of the process is it in?')
     parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=0,
                         help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
@@ -264,6 +264,85 @@ def runSims(args):
 
     return True 
 
+### RERUN FUNCTIONS ###
+
+def check_failed(log_address):
+    '''Check end of log file to see if simulation completed successfully. Return True if it did not.'''
+
+    with open(log_address, 'r') as f:
+        lines = f.readlines()
+
+    # Lines that should always be present towards the end of a successfully completed rat logfile.
+    checks = {
+        'ProcBlock::~ProcBlock Processor usage statistics': False,
+        'ConditionalProcBlock::~ConditionalProcBlock Processor usage statistics': False,
+        'Gsim::~Gsim Event simulation statistics': False,
+        'GLG4PrimaryGeneratorAction::~GLG4PrimaryGeneratorAction: Deleting generators.': False,
+        'Graphics systems deleted.': False,
+        'Visualization Manager deleting...': False
+    }
+
+    for line in lines:
+        stripped_line = line.strip()
+        if stripped_line in checks:
+            checks[stripped_line] = True
+
+    lines_present = True
+    for key in checks:
+        lines_present = lines_present and checks[key]
+    
+    return not lines_present
+
+def reSim(args):
+    '''Check which simulations failed, and rerun them'''
+
+    print('Running reSim().')
+    _, _, commandList_address, new_job_address, _ = make_addresses(args)
+
+    # Read in command list file, to get log file addresses
+    with open(commandList_address, 'r') as f:
+        commands = f.readlines()
+
+    # Get log file, and output sim file addresses
+    for i, command in enumerate(commands):
+        if ' -o ' not in command or ' -l ' not in command:
+            print('No outRoot file or log file defined in line: "{}"',format(command))
+        else:
+            arguments = command.split(' ')
+            outRoot_file = ''
+            log_file = ''
+            for j, argument in enumerate(arguments):
+                if argument == '-o':
+                    outRoot_file = arguments[j + 1]
+                elif argument == '-l':
+                    log_file = arguments[j + 1]
+
+            if outRoot_file != '' and log_file != '':
+                # Check if simulation failed
+                failed = check_failed(log_file)
+
+                if failed:
+                    print('Simulation {} failed.'.format(i))
+                    confirmation = input('Delete outputs, and rerun? Answer with Y/!Y. ANSWER: ')
+                    if confirmation in ('Y', 'y', True):
+                        # Delete outRoot and log files
+                        if args.verbose:
+                            print('Deleting: {}'.format(outRoot_file))
+                        command = 'rm ' + outRoot_file
+                        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                        if args.verbose:
+                            print('Deleting: {}'.format(log_file))
+                        command = 'rm ' + log_file
+                        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+                        # Rerun simulation
+                        command = 'qsub -t ' + str(i+1) + '-' + str(i+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
+                        if args.verbose:
+                            print('Running command: ', command)
+                        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
+
 ### Analysis functions ###
 
 def getInfo(args):
@@ -327,6 +406,7 @@ def main():
 
     work_modes = {
         'sim': runSims,
+        'resim': reSim,
         'info': getInfo
     }
 
