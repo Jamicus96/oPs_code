@@ -308,7 +308,7 @@ def runSims(args):
         for i in range(len(n_evts)):
             # Create all the commands to run the macro
             outroot_address = save_sims_folder + 'simOut_' + filename_format(args.particle, energies) + '_' + str(args.start_fileNum + i) + '.root'
-            log_file_address = save_macro_folder + 'log_files/ratLog_' + filename_format(args.particle, energies) + '.log'
+            log_file_address = save_macro_folder + 'log_files/ratLog_' + filename_format(args.particle, energies) + '_' + str(args.start_fileNum + i) + '.log'
             macro_command = 'rat -P ' + macro_address + ' -N ' + str(n_evts[i]) + ' -o ' + outroot_address + ' -l ' + log_file_address
             if args.verbose:
                 macro_command += ' -vv'
@@ -473,9 +473,9 @@ def getInfo(args):
     jobScript_addresses = []
     command_base = repo_address + 'scripts/get_evt_info.exe '
     for energies in energies_list:
-        output_file = save_info_folder + 'info_' + filename_format(args.particle, energies) + '.txt'
+        output_file = save_info_folder + 'info_' + filename_format(args.particle, energies) + '_' + str(args.start_fileNum) + '.txt'
 
-        command = command_base + output_file
+        command = command_base + output_file + ' ' + str(args.start_fileNum)
         # if args.particle == 'o-Ps':
         #     command += ' ' + str(1)
         # else:

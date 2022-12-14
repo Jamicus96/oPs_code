@@ -1,13 +1,13 @@
 #
 #
-#	Macro for simulating events using nCapture vertex generator in AV, inner side (fill shell)
+#	      Macro for simulating events using nCapture vertex generator in AV, inner side (fill shell)
 #
-#	Taken from: rat/mac/run-by-run-production/partialfitter_0p5labppo/partialfill/ReactorIBD.mac
-#	Removed datacleaning.
-#	No run dependence of noise.
-#	Added o-Ps line.
-#	Added tracking, and update 10.
-#       Add alpha-n classifier.
+#	      Taken from: rat/mac/run-by-run-production/partialfitter_0p5labppo/partialfill/ReactorIBD.mac
+#	      Removed datacleaning.
+#	      No run dependence of noise.
+#	      Added o-Ps line.
+#	      Added tracking, and update 10.
+#       Added alpha-n classifier.
 
 /rat/physics_list/OmitMuonicProcesses true
 
@@ -17,7 +17,7 @@
 /rat/db/set OPTICS[labppo_0p5_scintillator] ABSLENGTH_SCALING [1.0,4.0,] # Use the abslength scaling value that was used to tune the partialfill optics
 
 # Set o-Ps values
-/rat/db/set POSITRONIUM formfrac 0.0   # NEW
+#/rat/db/set POSITRONIUM formfrac 0.0   # NEW
 
 # store tracking info except certain particles
 /rat/tracking/store full   # NEW

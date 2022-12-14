@@ -7,7 +7,7 @@
 /rat/db/set GEO[inner_av] material "labppo_1p1_berkeley_scintillator"
 
 # Set o-Ps values
-/rat/db/set POSITRONIUM formfrac 0.36
+#/rat/db/set POSITRONIUM formfrac 0.36
 
 # store tracking info except certain particles
 /rat/tracking/store full
@@ -28,10 +28,10 @@
 /rat/proc scintFitter
 
 # Run new Positronium classifier (results can be accessed when analysing output root file)
-/rat/proc classifier
-/rat/procset classifier "PositroniumClassifier"
-/rat/procset seed "scintFitter"
-/rat/procset name "PositroniumClassifier"
+#/rat/proc classifier
+#/rat/procset classifier "PositroniumClassifier"
+#/rat/procset seed "scintFitter"
+#/rat/procset name "PositroniumClassifier"
 
 /rat/proc outroot
 /rat/procset file "oPs_output.root"

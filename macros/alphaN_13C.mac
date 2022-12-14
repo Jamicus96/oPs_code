@@ -1,6 +1,9 @@
 # Set the detector geometry and noise rate database entries used in the simulation
 /rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
-/rat/db/set GEO[inner_av] material "labppo_1p1_berkeley_scintillator"
+/rat/db/set GEO[inner_av] material "labppo_0p5_scintillator"
+
+# Set o-Ps values
+/rat/db/set POSITRONIUM formfrac 0.0
 
 # store tracking info except certain particles
 /rat/tracking/store full
@@ -27,10 +30,10 @@
 /rat/proc scintFitter
 
 # Run classifiers
-/rat/proc classifier
-/rat/procset classifier "PositroniumClassifier"
-/rat/procset seed "scintFitter"
-/rat/procset name "PositroniumClassifier"
+#/rat/proc classifier
+#/rat/procset classifier "PositroniumClassifier"
+#/rat/procset seed "scintFitter"
+#/rat/procset name "PositroniumClassifier"
 
 /rat/proc classifier
 /rat/procset classifier "AlphaNReactorIBDClassifier"
