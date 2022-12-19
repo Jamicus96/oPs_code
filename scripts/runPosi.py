@@ -24,7 +24,7 @@ def argparser():
                         default=10000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
-    parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
+    parser.add_argument('--max_jobs', '-mx', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info'],
                         help='which step of the process is it in?')
@@ -175,7 +175,7 @@ def makeMacro(new_macro_address, example_macro):
         if '/rat/procset file' in line:
             new_line = '#' + line  # Will set with run-time argument
         elif '/rat/run/start' in line:
-            new_line = '#' + line  # Will set with run-time argument
+            new_line = '/rat/run/start\n'  # Don't say how many events. Will be set in runtime argument
         else:
             new_line = line
 
@@ -201,32 +201,32 @@ def make_addresses(args):
     logFile_repo = checkRepo(logFile_repo, args.verbose)
 
     # New addresses
-    new_macro_address = save_sims_folder + 'macro_' + filename_format(args.macro) + '.mac'
+    new_macro_address = jobScript_repo + 'macro_' + filename_format(args.macro) + '.mac'
     commandList_address = jobScript_repo + 'sim_commandList_' + filename_format(args.macro) + '.txt'
     new_job_address = jobScript_repo + job_str_map('sims_', args.macro) + '.job'
     output_logFile_address = logFile_repo + 'log_sims_' + filename_format(args.macro) + '.txt'
 
-    return save_sims_folder, new_macro_address, commandList_address, new_job_address, output_logFile_address
+    return save_sims_folder, logFile_repo, new_macro_address, commandList_address, new_job_address, output_logFile_address
 
-def make_command_list(save_sims_folder, new_macro_address, n_evts, args):
+def make_command_list(save_sims_folder, logFile_repo, new_macro_address, n_evts, args):
     '''Create list of commands to be printed to file, and used by job script.'''
 
     commands = []
     for i in range(len(n_evts)):
         # Create all the commands to run the macro
         outroot_address = save_sims_folder + 'simOut_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.root'
-        log_file_address = save_sims_folder + 'log_files/ratLog_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.log'
+        log_file_address = logFile_repo + 'ratLog_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.log'
         macro_command = 'rat -P ' + new_macro_address + ' -N ' + str(n_evts[i]) + ' -o ' + outroot_address + ' -l ' + log_file_address
         if args.verbose:
             macro_command += ' -vv'
-        commands.append(macro_command)
+        commands.append(macro_command + '\n')
     return commands
 
 def runSims(args):
     '''Runs simulations based in input information'''
 
     print('Running runSims().')
-    save_sims_folder, new_macro_address, commandList_address, new_job_address, output_logFile_address = make_addresses(args)
+    save_sims_folder, logFile_repo, new_macro_address, commandList_address, new_job_address, output_logFile_address = make_addresses(args)
 
     # Read in example macro and job script + info
     repo_address = getRepoAddress()
@@ -247,7 +247,7 @@ def runSims(args):
     makeMacro(new_macro_address, example_macro)
 
     # Create command list file to call macro repeatedly
-    commands = make_command_list(save_sims_folder, new_macro_address, n_evts, args)
+    commands = make_command_list(save_sims_folder, logFile_repo, new_macro_address, n_evts, args)
     with open(commandList_address, 'w') as f:
         command_list = ''.join(commands)
         f.write(command_list)
@@ -297,13 +297,17 @@ def reSim(args):
     '''Check which simulations failed, and rerun them'''
 
     print('Running reSim().')
-    _, _, commandList_address, new_job_address, _ = make_addresses(args)
+    _, _, _, commandList_address, new_job_address, _ = make_addresses(args)
+
+    checkJobsDone('sims_', args.macro, 10, args.verbose)
 
     # Read in command list file, to get log file addresses
     with open(commandList_address, 'r') as f:
         commands = f.readlines()
 
     # Get log file, and output sim file addresses
+    rerun_info = []
+    rerun_numbers = ''
     for i, command in enumerate(commands):
         if ' -o ' not in command or ' -l ' not in command:
             print('No outRoot file or log file defined in line: "{}"',format(command))
@@ -322,24 +326,33 @@ def reSim(args):
                 failed = check_failed(log_file)
 
                 if failed:
-                    print('Simulation {} failed.'.format(i))
-                    confirmation = input('Delete outputs, and rerun? Answer with Y/!Y. ANSWER: ')
-                    if confirmation in ('Y', 'y', True):
-                        # Delete outRoot and log files
-                        if args.verbose:
-                            print('Deleting: {}'.format(outRoot_file))
-                        command = 'rm ' + outRoot_file
-                        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
-                        if args.verbose:
-                            print('Deleting: {}'.format(log_file))
-                        command = 'rm ' + log_file
-                        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                    rerun_info.append((i, outRoot_file, log_file))
+                    rerun_numbers += ', ' + str(i)
+    if rerun_numbers[:2] == ', ':
+        rerun_numbers = rerun_numbers[2:]
+    
+    if len(rerun_info) > 0:
+        print('Simulations {} failed.'.format(rerun_numbers))
+        confirmation = input('Delete outputs, and rerun them? Answer with Y/!Y. ANSWER: ')
+        if confirmation in ('Y', 'y', True):
+            for i, outRoot_file, log_file in rerun_info:
+                # Delete outRoot and log files
+                if args.verbose:
+                    print('Deleting: {}'.format(outRoot_file))
+                command = 'rm ' + outRoot_file
+                subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                if args.verbose:
+                    print('Deleting: {}'.format(log_file))
+                command = 'rm ' + log_file
+                subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
-                        # Rerun simulation
-                        command = 'qsub -t ' + str(i+1) + '-' + str(i+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
-                        if args.verbose:
-                            print('Running command: ', command)
-                        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                # Rerun simulation
+                command = 'qsub -t ' + str(i+1) + '-' + str(i+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
+                if args.verbose:
+                    print('Running command: ', command)
+                subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+    else:
+        print('No simulations failed.')
 
     return True
 
@@ -369,7 +382,7 @@ def getInfo(args):
     command_base = repo_address + 'scripts/get_evt_info.exe '
     output_file = save_info_folder + 'info_' + filename_format(args.macro) + '_' + str(args.start_fileNum) + '.txt'
 
-    command = command_base + output_file + ' ' + str(args.start_fileNum) + ' ' + str(int(args.verbose))
+    command = command_base + output_file + ' ' + str(int(args.start_fileNum) * int(args.nevts_persim)) + ' ' + str(int(args.verbose))
 
     sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.macro)
     for i in range(len(n_evts)):
