@@ -16,9 +16,9 @@ def argparser():
                         # default='macros/2p2labppo/alphaN_13C.mac')
 
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/getClassification/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/makePDFs/info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/getClassification/info/', help='Folder to save info text files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=10000, help='Number of events to simulate for each setting, total')
