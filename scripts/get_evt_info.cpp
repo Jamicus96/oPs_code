@@ -201,16 +201,17 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
 
         try {
             // Get classifier info
+            double alphaNreactor_classier_result;
             if (!evt.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
                 std::cout << "No AlphaNReactorIBDClassifier results." << std::endl;
-                return output;
-            }
-            if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
+                alphaNreactor_classier_result = -999.;
+            } else if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
                 std::cout << "No valid AlphaNReactorIBDClassifier result." << std::endl;
-                return output;
+                alphaNreactor_classier_result = -999.;
+            } else {
+                RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
+                alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
             }
-            RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
-            double alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
 
             // Package output info
             output = {alphaNreactor_classier_result, KE, PDG_code, pos.X(), pos.Y(), pos.Z()};
