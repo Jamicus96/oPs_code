@@ -12,23 +12,23 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--macro', '-m', type=str, dest='macro', help='Which macro to base simulation macros off of.',
-                        default='macros/2p2labppo/ReactorIBD.mac')
-                        # default='macros/2p2labppo/alphaN_13C.mac')
+                        # default='macros/2p2labppo/ReactorIBD.mac')
+                        default='macros/2p2labppo/alphaN_13C.mac')
 
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/getClassification/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/ppo_loading_recoordination/makePDFs/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/getClassification/info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/ppo_loading_recoordination/makePDFs/info/', help='Folder to save info text files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
-                        default=10000, help='Number of events to simulate for each setting, total')
+                        default=300000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-mx', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info'],
                         help='which step of the process is it in?')
-    parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=0,
+    parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=200,
                         help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')

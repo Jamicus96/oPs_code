@@ -25,6 +25,7 @@
 #include <RAT/DS/MC.hh>
 #include <RAT/DS/EV.hh>
 #include <RAT/DS/PMT.hh>
+#include "RAT/DU/Point3D.hh"
 #include <RAT/DS/FitResult.hh>
 
 #include <RAT/TrackNav.hh>
@@ -267,16 +268,17 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         double vertex_time = rVertex.GetTime();
 
         // Get classifier info
+        double alphaNreactor_classier_result;
         if (!evt.ClassifierResultExists("AlphaNReactorIBDClassifier")) {
             std::cout << "No AlphaNReactorIBDClassifier results." << std::endl;
-            return output;
-        }
-        if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
+            alphaNreactor_classier_result = -999.;
+        } else if (!evt.GetClassifierResult("AlphaNReactorIBDClassifier").GetValid()) {
             std::cout << "No valid AlphaNReactorIBDClassifier result." << std::endl;
-            return output;
+            alphaNreactor_classier_result = -999.;
+        } else {
+            RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
+            alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
         }
-        RAT::DS::ClassifierResult alphaNreactor_result = evt.GetClassifierResult("AlphaNReactorIBDClassifier");
-        double alphaNreactor_classier_result = alphaNreactor_result.GetClassification("AlphaNReactorIBDClassifier");
 
         // Package info
         output = {alphaNreactor_classier_result, energy, pos.X(), pos.Y(), pos.Z()};
