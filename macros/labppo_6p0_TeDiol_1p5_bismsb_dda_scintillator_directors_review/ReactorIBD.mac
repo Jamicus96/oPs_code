@@ -1,0 +1,76 @@
+#       Simulate Reactor IBD flux in 2p2labppo material
+#
+#	    Taken from: rat/mac/run-by-run-production/scintfitter_2p2labppo/ReactorIBD.mac
+#	    Removed datacleaning.
+#	    No run dependence of noise (no change).
+#       Add count update.
+#       Comment out outntuple.
+
+
+/rat/physics_list/OmitMuonicProcesses true
+
+/rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
+/rat/db/set GEO[inner_av] material "labppo_6p0_TeDiol_1p5_bismsb_dda_scintillator_directors_review"
+
+# Remove long-lived particles
+/rat/db/set MC event_cutoff_time 1e7
+
+# Simulate noise using per-pmt rates
+/rat/db/set NOISE_MC noise_flag 2
+# Read the per-pmt noise rates from the NOISE_RUN_INTEGRATED table:
+/rat/db/set NOISE_MC integ_noise_flag 1
+
+# Apply trigger cutoff
+/rat/db/set DAQ apply_cutoff 1
+
+/run/initialize
+
+########## EVENT LOOP ############
+
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
+/rat/proc count  # NEW
+/rat/procset update 10 	# NEW
+
+# /rat/proc datacleaning
+# /rat/procset index "scintillator"
+# /rat/procset mask "default_apply"
+
+# Apply same reconstruction logic as the processed data
+/rat/proc/if trigTypeSelector
+  # We do not want to process events with the PED trigger - ie the Nhit monitor
+  # Additionally, EXTA events are from optical calibration sources. Don't reconstruct.
+  /rat/procset trigType "Pedestal"
+  /rat/procset trigType "EXTASY"
+
+/rat/proc/else
+
+    /rat/proc scintFitter
+
+    /rat/procset alphaBeta212.nhit_cut 100000  # NEW: speeds up sims a lot
+    /rat/procset alphaBeta214.nhit_cut 100000  # NEW: speeds up sims a lot
+
+    /rat/proc classifier  #NEW
+    /rat/procset classifier "AlphaNReactorIBDClassifier"  #NEW
+    /rat/procset seed "scintFitter"  #NEW
+    /rat/procset name "AlphaNReactorIBDClassifier"  #NEW
+
+/rat/proc/endif           # not ped and EXTASY events
+
+/rat/proc prune
+/rat/procset prune "mc.pmts,mc.hits,mcevs,ev.uncalPMTs,ev.intermedCalPMTs"
+
+# /rat/proc outntuple
+/rat/proclast outroot
+
+########## EVENT LOOP ############
+
+/generator/add reactor ALL:ibd:fill:poisson
+/generator/pos/set 0 0 0
+/generator/set flux_scale 30000
+
+/rat/run/start
+exit

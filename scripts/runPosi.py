@@ -12,26 +12,34 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--macro', '-m', type=str, dest='macro', help='Which macro to base simulation macros off of.',
-                        # default='macros/2p2labppo/ReactorIBD.mac')
-                        default='macros/2p2labppo/alphaN_13C.mac')
+                        # default='macros/labppo_2p2_scintillator/ReactorIBD.mac')
+                        default='macros/labppo_2p2_scintillator/flat/IBD_flat.mac')
+                        # default='macros/labppo_2p2_scintillator/alphaN_13C.mac')
+                        # default='macros/labppo_2p2_scintillator/GeoIBD.mac')
 
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/ppo_loading_recoordination/makePDFs/sims/', help='Folder to save intial root files from simulations in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/sims/', help='Folder to save intial root files from simulations in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/ratds/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Analysis_data/AmBe/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/ppo_loading_recoordination/makePDFs/info/', help='Folder to save info text files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/info/', help='Folder to save info text files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_info/', help='Folder to save info text files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
-                        default=300000, help='Number of events to simulate for each setting, total')
+                        default=100000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-mx', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info'],
                         help='which step of the process is it in?')
-    parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=200,
+    parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=0,
                         help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
+    parser.add_argument('---use_all_files_in_dir', '-A', type=bool, dest='use_all_files_in_dir',
+                        default=False, help='For [info] mode. Instead of using the number of events to work out which files to get info from in sim directory, just use all the files in there.')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
-                    default=True, help='print and save extra info')
+                        default=True, help='print and save extra info')
 
     args = parser.parse_args()
     return args
@@ -299,7 +307,7 @@ def reSim(args):
     print('Running reSim().')
     _, _, _, commandList_address, new_job_address, _ = make_addresses(args)
 
-    checkJobsDone('sims_', args.macro, 10, args.verbose)
+    # checkJobsDone('sims_', args.macro, 10, args.verbose)
 
     # Read in command list file, to get log file addresses
     with open(commandList_address, 'r') as f:
@@ -384,9 +392,16 @@ def getInfo(args):
 
     command = command_base + output_file + ' ' + str(int(args.start_fileNum) * int(args.nevts_persim)) + ' ' + str(int(args.verbose))
 
-    sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.macro)
-    for i in range(len(n_evts)):
-        command += ' ' + sim_file_format + '_' + str(args.start_fileNum + i) + '.root'
+    if True:
+        for filename in os.listdir(args.sim_repo):
+            file_address = os.path.join(args.sim_repo, filename)
+            if os.path.isfile(file_address):
+                if file_address[-5:] == '.root':
+                    command += ' ' + file_address
+    else:
+        sim_file_format = save_sims_folder + 'simOut_' + filename_format(args.macro)
+        for i in range(len(n_evts)):
+            command += ' ' + sim_file_format + '_' + str(args.start_fileNum + i) + '.root'
 
     # Make job script
     new_job_address = save_info_folder + 'job_scripts/'

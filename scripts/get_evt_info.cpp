@@ -110,12 +110,13 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
     // Print these to first line of file
     output_file << Nbins << ", " << lower_lim << ", " <<  upper_lim << std::endl;
 
-    RAT::DB::Get()->SetAirplaneModeStatus(true);
+    // RAT::DB::Get()->SetAirplaneModeStatus(true);
     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
 
 
     /*********** Loop through all files, entries, events, and PMTs ***********/
     // loops through files
+    // double KE;
     unsigned int entry_num = starting_fileNum;
     ULong64_t previous_50MHz_time = 0;
     for (unsigned int i = 0; i < fileNames.size(); ++i) {
@@ -154,6 +155,9 @@ void print_info_to_file(const std::vector<std::string>& fileNames, const std::st
                 //     }
                 //     output_file << info_MC.at(info_MC.size() - 1) << std::endl;
                 // }
+
+                // Get true KE, if it exists
+                // KE = rDS.GetMC().GetMCParticle(iEV).GetKineticEnergy();
 
                 // Get recon info, and (if it exists) print to file
                 std::vector<double> info_recon = get_recon_info(rEV, fTRCalc, Nbins, lower_lim, upper_lim, fitName);
@@ -299,6 +303,7 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         }
         delete hist;
     }
+    catch (const RAT::DS::DataNotFound&) {return output;}  // no fit data
     catch (const RAT::DS::FitCollection::NoResultError&) {return output;} // no fit result by the name of fitName
     catch (const RAT::DS::FitResult::NoVertexError&) {return output;} // no fit vertex
     catch (const RAT::DS::FitVertex::NoValueError&) {return output;} // position or time missing
