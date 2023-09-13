@@ -25,6 +25,14 @@ def argparser():
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/info/', help='Folder to save info text files in.')
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_info/', help='Folder to save info text files in.')
                         default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_info/', help='Folder to save info text files in.')
+    parser.add_argument('--hist_repo', '-hr', type=str, dest='hist_repo',
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hist/', help='Folder to save hist root files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_hist/', help='Folder to save hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_hist/', help='Folder to save hist root files in.')
+    parser.add_argument('--tothist_repo', '-tr', type=str, dest='tothist_repo',
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hist/', help='Folder to save combined total hist root files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_hist/', help='Folder to save combined total hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_tothist/', help='Folder to save combined total hist root files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=100000, help='Number of events to simulate for each setting, total')
@@ -32,12 +40,12 @@ def argparser():
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-mx', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info'],
+    parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info', 'hist', 'combi'],
                         help='which step of the process is it in?')
     parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=0,
                         help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
     parser.add_argument('---use_all_files_in_dir', '-A', type=bool, dest='use_all_files_in_dir',
-                        default=False, help='For [info] mode. Instead of using the number of events to work out which files to get info from in sim directory, just use all the files in there.')
+                        default=False, help='For [info] or [hist] modes. Instead of using the number of events to work out which files to get info from in sim directory, just use all the files in there.')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                         default=True, help='print and save extra info')
 
@@ -392,7 +400,7 @@ def getInfo(args):
 
     command = command_base + output_file + ' ' + str(int(args.start_fileNum) * int(args.nevts_persim)) + ' ' + str(int(args.verbose))
 
-    if True:
+    if args.use_all_files_in_dir:
         for filename in os.listdir(args.sim_repo):
             file_address = os.path.join(args.sim_repo, filename)
             if os.path.isfile(file_address):
@@ -426,6 +434,123 @@ def getInfo(args):
 
     return True
 
+
+def getHists(args):
+    '''Get info from simulaltion output and print everything to text file'''
+    print('Running getHists().')
+
+    # Read in example macro and job script + info
+    repo_address = getRepoAddress()
+
+    ### Create file and folder addresses needed by other functions ###
+
+    # Make sure folders are of the correct format to  use later
+    save_sims_folder = checkRepo(args.sim_repo, args.verbose)
+    save_hist_folder = checkRepo(args.hist_repo, args.verbose)
+
+    # Folder for job scripts and command lists they use
+    jobScript_repo = save_hist_folder + 'job_scripts/'
+    jobScript_repo = checkRepo(jobScript_repo, args.verbose)
+
+    # Log file folder
+    logFile_repo = save_hist_folder + 'log/'
+    logFile_repo = checkRepo(logFile_repo, args.verbose)
+
+    # New addresses
+    commandList_address = jobScript_repo + 'hist_commandList.txt'
+    new_job_address = jobScript_repo + 'hist_job.job'
+    output_logFile_address = logFile_repo + 'log_hist.txt'
+
+    ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
+    print('Creating analysis job scripts...')
+    command_base = repo_address + 'scripts/make_hists.exe '
+    output_file = save_hist_folder + 'out_hists.root'
+
+    command_base += output_file + ' ' + str(int(args.verbose))
+
+    commands = []
+    i = 0
+    if args.use_all_files_in_dir:
+        for filename in os.listdir(args.sim_repo):
+            file_address = os.path.join(args.sim_repo, filename)
+            if os.path.isfile(file_address):
+                if file_address[-5:] == '.root':
+                    out_address = save_hist_folder + 'hist_' + str(i) + '.root'
+                    commands.append(command_base + ' ' + out_address + str(int(args.verbose)) + file_address)
+                    i += 1
+    else:
+        # How simulations were split up
+        n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
+        for i in range(len(n_evts)):
+            file_address = save_sims_folder + 'simOut_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.root'
+            out_address = save_hist_folder + 'hist_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.root'
+            commands.append(command_base + ' ' + out_address + str(int(args.verbose)) + file_address)
+
+    ## Create command list files
+    with open(commandList_address, 'w') as f:
+        command_list = ''.join(commands)
+        f.write(command_list)
+
+    # Create the job script to run all these commands in a file
+    example_jobScript_address = repo_address + 'job_scripts/jobArray.job'
+    with open(example_jobScript_address, 'r') as f:
+        example_jobScript = f.readlines()
+    job_address = makeJobArrayScript(new_job_address, output_logFile_address, example_jobScript, commandList_address)
+
+    # Wait until previous jobs are done
+    checkJobsDone('sims_', args.macro, 10, args.verbose)
+
+    ### RUN JOB SCRIPTS ###
+    print('Submitting job array...')
+    command = 'qsub -t 1-' + str(len(n_evts)) + ' -tc ' + str(args.max_jobs) + ' ' + job_address 
+    if args.verbose:
+        print('Running command: ', command)
+    subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
+
+def combiHists(args, input_info):
+    '''Combine split histograms together'''
+    print('Running combiHists().')
+
+    # Read in example macro and job script + info
+    repo_address = getRepoAddress()
+
+    # Make sure folders are of the correct format to  use later
+    save_splithists_folder = checkRepo(args.hist_repo, args.verbose)
+    save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
+
+    # Get example job script
+    example_jobScript_address = repo_address + 'job_scripts/jobSingle.job'
+    with open(example_jobScript_address, "r") as f:
+        example_jobScript = f.readlines()
+
+    # Making job scripts
+    command = 'hadd ' + save_tothists_folder + 'tot_hists.root ' + save_splithists_folder + 'hist_*.root'
+
+    # Make job script
+    new_job_address = save_tothists_folder + 'job_scripts/'
+    new_job_address = checkRepo(new_job_address, args.verbose)
+    new_job_address += job_str_map('info_', args.macro) + '.job'
+
+    output_logFile_address = save_tothists_folder + 'log_files/'
+    output_logFile_address = checkRepo(output_logFile_address, args.verbose)
+    output_logFile_address +=  'log_info_' + filename_format(args.macro) + '.txt'
+    makeJobSingleScript(new_job_address, output_logFile_address, example_jobScript, command)
+
+    # Wait until these job arrays are done
+    checkJobsDone('hist_', input_info, 10, args.verbose)
+    
+    ### RUN JOB SCRIPTS ###
+    print('Submitting job...')
+    # For higher energies, the jobs need more memory, otherwise they get killed
+    command = 'qsub -l m_mem_free=4G ' + new_job_address
+    if args.verbose:
+        print('Running command: ', command)
+    subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
+
 ### MAIN ###
 
 def main():
@@ -435,7 +560,9 @@ def main():
     work_modes = {
         'sim': runSims,
         'resim': reSim,
-        'info': getInfo
+        'info': getInfo,
+        'hist': getHists,
+        'combi': combiHists
     }
 
     result = work_modes[args.step](args)
