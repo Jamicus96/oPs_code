@@ -1,0 +1,58 @@
+# Set the detector geometry and noise rate database entries used in the simulation
+/rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
+/rat/db/set GEO[inner_av] material "labppo_0p5_scintillator"
+
+# Set o-Ps values
+/rat/db/set POSITRONIUM formfrac 0.0
+
+# store tracking info except certain particles
+/rat/tracking/store full
+/rat/tracking/omit opticalphoton
+/rat/tracking/omit e-
+
+#MC cutoff parameters
+/rat/db/set MC event_cutoff_time 1e9
+/rat/db/set MC event_cutoff_nstep 1000
+
+
+# BEGIN EVENT LOOP
+
+/run/initialize
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
+/rat/proc count
+/rat/procset update 10
+
+# Run fitter
+/rat/proc scintFitter
+
+# Run classifiers
+#/rat/proc classifier
+#/rat/procset classifier "PositroniumClassifier"
+#/rat/procset seed "scintFitter"
+#/rat/procset name "PositroniumClassifier"
+
+/rat/proc classifier
+/rat/procset classifier "AlphaNReactorIBDClassifier"
+/rat/procset seed "scintFitter"
+/rat/procset name "AlphaNReactorIBDClassifier"
+
+/rat/proclast outroot
+/rat/procset file "oPs_output.root"
+
+# END EVENT LOOP
+
+
+/generator/add combo alpha_n:fill:uniform
+# The generator can be set to produce a different neutron spectrum
+# depending on whether the vertex is set to LAB, TeLAB or AV
+# The second argument sets whether the alpha has been absorbed by 13C or 18O
+/generator/vtx/set LAB 13C
+/generator/pos/set inner_av
+/generator/rate/set 1
+
+/rat/run/start 1000
+exit

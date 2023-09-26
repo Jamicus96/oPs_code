@@ -1,0 +1,38 @@
+# File: inroot.mac
+# Brief: Macro showing how to load a root file and run processoers on the data
+#
+# Date: 2014-07-24
+# Contact: P G Jones, <p.g.jones@qmul.ac.uk>
+# Revisions:
+#
+# This macro demonstrates how to load a root file called input.root and run
+# processors on it including output to a root file called output.root.
+
+/rat/inroot/load /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/antinu/Positronium/e-_output.root
+
+# Extra files can also be loaded by including extra lines, such as:
+#/rat/inroot/load input2.root
+
+# To load files from the command line using the '-i' option
+# /rat/inroot/load_default
+# can be used instead
+
+/run/initialize
+
+# BEGIN EVENT LOOP
+
+# Run fitter
+/rat/proc scintFitter
+
+# Run new Positronium classifier (results can be accessed when analysing output root file)
+/rat/proc classifier
+/rat/procset classifier "PositroniumClassifier"
+/rat/procset seed "scintFitter"
+
+/rat/proc outroot
+/rat/procset file "Proc_e-_output.root"
+# END EVENT LOOP
+
+/rat/inroot/read
+
+exit

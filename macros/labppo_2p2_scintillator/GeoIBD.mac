@@ -1,0 +1,82 @@
+#  File:       GeoIBD.mac
+#  Date:       2022-10-07
+#  Contact:    V Lozza <vlozza@lip.pt>
+#
+#      Macro to be run with a specified run number via option "-r"
+#      This mac file is based on the file of the same name for water phase.
+
+
+/rat/physics_list/OmitMuonicProcesses true
+
+/rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
+/rat/db/set GEO[inner_av] material "labppo_2p2_scintillator" # 2.2 g/L PPO
+
+# Remove long-lived particles
+/rat/db/set MC event_cutoff_time 1e7
+
+# Simulate noise using per-pmt rates
+/rat/db/set NOISE_MC noise_flag 2
+# Read the per-pmt noise rates from the NOISE_RUN_INTEGRATED table:
+/rat/db/set NOISE_MC integ_noise_flag 1
+
+# Apply trigger cutoff
+/rat/db/set DAQ apply_cutoff 1
+
+/run/initialize
+
+########## EVENT LOOP ############
+
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
+/rat/proc count
+/rat/procset update 10
+
+/rat/proc datacleaning
+/rat/procset index "scintillator"
+/rat/procset mask "default_apply"
+
+# Apply same reconstruction logic as the processed data
+/rat/proc/if trigTypeSelector
+  # We do not want to process events with the PED trigger - ie the Nhit monitor
+  # Additionally, EXTA events are from optical calibration sources. Don't reconstruct.
+  /rat/procset trigType "Pedestal"
+  /rat/procset trigType "EXTASY"
+
+/rat/proc/else
+
+    /rat/proc scintFitter
+
+    /rat/proc classifier
+    /rat/procset classifier "AlphaNReactorIBDClassifier"
+    /rat/procset seed "scintFitter"
+    /rat/procset name "AlphaNReactorIBDClassifier"
+
+/rat/proc/endif           # not ped and EXTASY events
+
+/rat/proc prune
+/rat/procset prune "mc.pmts,mc.hits,mcevs,ev.uncalPMTs,ev.intermedCalPMTs"
+
+# /rat/proc outntuple
+# /rat/procset file
+/rat/proclast outroot
+
+########## EVENT LOOP ############
+
+  # Set the Uranium and Thorium geoneutrino generators
+  # Rates are 30,000 times AV-internal MidQ rates [DocDB 5512]
+
+/generator/add combo ibd:fill:poisson
+/generator/vtx/set 0 0 0 UGeonus
+/generator/pos/set 0 0 0
+/generator/rate/set 0.01873  # [Hz]
+
+/generator/add combo ibd:fill:poisson
+/generator/vtx/set 0 0 0 ThGeonus
+/generator/pos/set 0 0 0
+/generator/rate/set 0.00523  # [Hz]
+
+/rat/run/start
+exit

@@ -1,0 +1,50 @@
+# Set the detector geometry and noise rate database entries used in the simulation
+/rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
+/rat/db/set GEO[inner_av] material "labppo_1p1_berkeley_scintillator"
+
+
+# store tracking info except certain particles
+/rat/tracking/store full
+/rat/tracking/omit opticalphoton
+/rat/tracking/omit e-
+
+
+# BEGIN EVENT LOOP
+
+/run/initialize
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
+/rat/proc count
+/rat/procset update 10
+
+# Run fitter
+/rat/proc scintFitter
+
+# Run classifiers
+/rat/proc classifier
+/rat/procset classifier "PositroniumClassifier"
+/rat/procset seed "scintFitter"
+/rat/procset name "PositroniumClassifier"
+
+/rat/proc classifier
+/rat/procset classifier "AlphaNReactorIBDClassifier"
+/rat/procset seed "scintFitter"
+/rat/procset name "AlphaNReactorIBDClassifier"
+
+/rat/proc/if reactornuosc
+    /rat/proclast outroot
+    /rat/procset file "oPs_output.root"
+/rat/proc/endif
+
+# END EVENT LOOP
+
+
+/generator/add reactor ALL:ibd:fill:poisson
+/generator/pos/set 0 0 0
+/generator/set flux_scale 30000
+
+/rat/run/start 1000
+exit
