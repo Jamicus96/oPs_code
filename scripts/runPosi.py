@@ -20,20 +20,20 @@ def argparser():
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/sims/', help='Folder to save intial root files from simulations in.')
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/ratds/', help='Folder to save intial root files from simulations in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Analysis_data/AmBe/', help='Folder to save intial root files from simulations in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/ratds/', help='Folder to save intial root files from simulations in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/ratds/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Analysis_data/AmBe/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/info/', help='Folder to save info text files in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_info/', help='Folder to save info text files in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_info/', help='Folder to save info text files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_info/', help='Folder to save info text files in.')
     parser.add_argument('--hist_repo', '-hr', type=str, dest='hist_repo',
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hist/', help='Folder to save hist root files in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_hist/', help='Folder to save hist root files in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_hist/', help='Folder to save hist root files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_hist/', help='Folder to save hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_hist/', help='Folder to save hist root files in.')
     parser.add_argument('--tothist_repo', '-tr', type=str, dest='tothist_repo',
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hist/', help='Folder to save combined total hist root files in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_tothist/', help='Folder to save combined total hist root files in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_tothist/', help='Folder to save combined total hist root files in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_tothist/', help='Folder to save combined total hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_tothist/', help='Folder to save combined total hist root files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=100000, help='Number of events to simulate for each setting, total')
