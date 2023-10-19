@@ -12,41 +12,34 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--macro', '-m', type=str, dest='macro', help='Which macro to base simulation macros off of.',
-                        # default='macros/labppo_2p2_scintillator/ReactorIBD.mac')
-                        default='macros/labppo_2p2_scintillator/flat/IBD_flat.mac')
-                        # default='macros/labppo_2p2_scintillator/alphaN_13C.mac')
-                        # default='macros/labppo_2p2_scintillator/GeoIBD.mac')
+                        default='macros/labppo_2p2_scintillator/AmBe.mac')
 
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/sims/', help='Folder to save intial root files from simulations in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/ratds/', help='Folder to save intial root files from simulations in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/ratds/', help='Folder to save intial root files from simulations in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Analysis_data/AmBe/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/info/', help='Folder to save info text files in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_info/', help='Folder to save info text files in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/info/', help='Folder to save info text files in.')
     parser.add_argument('--hist_repo', '-hr', type=str, dest='hist_repo',
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hist/', help='Folder to save hist root files in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_hist/', help='Folder to save hist root files in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_hist/', help='Folder to save hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/hists/', help='Folder to save hist root files in.')
     parser.add_argument('--tothist_repo', '-tr', type=str, dest='tothist_repo',
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hist/', help='Folder to save combined total hist root files in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/MC_tothist/', help='Folder to save combined total hist root files in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_tothist/', help='Folder to save combined total hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/tot_hists/', help='Folder to save combined total hist root files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
-                        default=100000, help='Number of events to simulate for each setting, total')
+                        default=241500, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-mx', type=int, dest='max_jobs',
-                        default=200, help='Max number of tasks in an array running at any one time.')
+                        default=100, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info', 'hist', 'combi'],
                         help='which step of the process is it in?')
     parser.add_argument('---start_fileNum', '-sn', type=int, dest='start_fileNum', default=0,
                         help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
+    
+    parser.add_argument('---runNum_list', '-rl', type=str, dest='runNum_list', help='Text file with run numbers to simulate (one per line)',
+                        # default='')
+                        default='run_lists/AmBe.txt')
     parser.add_argument('---use_all_files_in_dir', '-A', type=bool, dest='use_all_files_in_dir',
                         default=False, help='For [info] or [hist] modes. Instead of using the number of events to work out which files to get info from in sim directory, just use all the files in there.')
+    
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                         default=True, help='print and save extra info')
 
@@ -225,18 +218,34 @@ def make_addresses(args):
 
     return save_sims_folder, logFile_repo, new_macro_address, commandList_address, new_job_address, output_logFile_address
 
-def make_command_list(save_sims_folder, logFile_repo, new_macro_address, n_evts, args):
+def make_command_list(save_sims_folder, logFile_repo, new_macro_address, n_evts, run_numbers, args):
     '''Create list of commands to be printed to file, and used by job script.'''
 
     commands = []
-    for i in range(len(n_evts)):
-        # Create all the commands to run the macro
-        outroot_address = save_sims_folder + 'simOut_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.root'
-        log_file_address = logFile_repo + 'ratLog_' + filename_format(args.macro) + '_' + str(args.start_fileNum + i) + '.log'
-        macro_command = 'rat -P ' + new_macro_address + ' -N ' + str(n_evts[i]) + ' -o ' + outroot_address + ' -l ' + log_file_address
-        if args.verbose:
-            macro_command += ' -vv'
-        commands.append(macro_command + '\n')
+    for run in run_numbers:
+        for i in range(len(n_evts)):
+            # Create all the commands to run the macro
+            outroot_address = save_sims_folder + 'simOut_' + filename_format(args.macro)
+            log_file_address = logFile_repo + 'ratLog_' + filename_format(args.macro)
+
+            if run:
+                outroot_address += '_' + str(run)
+                log_file_address += '_' + str(run)
+
+            outroot_address += '_' + str(args.start_fileNum + i) + '.root'
+            log_file_address += '_' + str(args.start_fileNum + i) + '.log'
+
+            macro_command = 'rat ' + new_macro_address + ' -N ' + str(n_evts[i]) + ' -o ' + outroot_address + ' -l ' + log_file_address
+
+            if run:
+                macro_command += ' -n ' + str(run)  # Choose the run number (can also choose sub-run number)
+            else:
+                macro_command += ' -P'  # Airplane mode (no remote db access, since unnecessary without a specific run)
+                
+            if args.verbose:
+                macro_command += ' -vv'
+            
+            commands.append(macro_command + '\n')
     return commands
 
 def runSims(args):
@@ -254,6 +263,16 @@ def runSims(args):
     with open(example_jobScript_address, 'r') as f:
         example_jobScript = f.readlines()
 
+    # Read in run number info, if provided
+    if args.runNum_list != '':
+        run_numbers = []
+        with open(repo_address + args.runNum_list, 'r') as f:
+            for num in f.readlines():
+                run_numbers.append(int(num))
+    else:
+        run_numbers = [False]
+    print()
+
     # How to split up sims into manageable macros
     n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
     
@@ -264,7 +283,7 @@ def runSims(args):
     makeMacro(new_macro_address, example_macro)
 
     # Create command list file to call macro repeatedly
-    commands = make_command_list(save_sims_folder, logFile_repo, new_macro_address, n_evts, args)
+    commands = make_command_list(save_sims_folder, logFile_repo, new_macro_address, n_evts, run_numbers, args)
     with open(commandList_address, 'w') as f:
         command_list = ''.join(commands)
         f.write(command_list)
@@ -274,7 +293,7 @@ def runSims(args):
 
     ### RUN JOB SCRIPTS ###
     print('Submitting job array...')
-    command = 'qsub -t 1-' + str(len(n_evts)) + ' -tc ' + str(args.max_jobs) + ' ' + job_address 
+    command = 'qsub -l m_mem_free=4G -t 1-' + str(len(n_evts) * len(run_numbers)) + ' -tc ' + str(args.max_jobs) + ' ' + job_address 
     if args.verbose:
         print('Running command: ', command)
     subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
@@ -285,6 +304,10 @@ def runSims(args):
 
 def check_failed(log_address):
     '''Check end of log file to see if simulation completed successfully. Return True if it did not.'''
+
+    # If log file doesn't exist, it definitely failed.
+    if not os.path.exists(log_address):
+        return True
 
     with open(log_address, 'r') as f:
         lines = f.readlines()
@@ -349,25 +372,45 @@ def reSim(args):
         rerun_numbers = rerun_numbers[2:]
     
     if len(rerun_info) > 0:
-        print('Simulations {} failed.'.format(rerun_numbers))
+        print('{} simulation(s) failed: {}'.format(len(rerun_info), rerun_numbers))
         confirmation = input('Delete outputs, and rerun them? Answer with Y/!Y. ANSWER: ')
         if confirmation in ('Y', 'y', True):
+            start_idx = -1
+            end_idx = -1
             for i, outRoot_file, log_file in rerun_info:
                 # Delete outRoot and log files
-                if args.verbose:
-                    print('Deleting: {}'.format(outRoot_file))
-                command = 'rm ' + outRoot_file
-                subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
-                if args.verbose:
-                    print('Deleting: {}'.format(log_file))
-                command = 'rm ' + log_file
-                subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                if os.path.exists(outRoot_file):
+                    if args.verbose:
+                        print('Deleting: {}'.format(outRoot_file))
+                    command = 'rm ' + outRoot_file
+                    subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                if os.path.exists(log_file):
+                    if args.verbose:
+                        print('Deleting: {}'.format(log_file))
+                    command = 'rm ' + log_file
+                    subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
-                # Rerun simulation
-                command = 'qsub -t ' + str(i+1) + '-' + str(i+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
-                if args.verbose:
-                    print('Running command: ', command)
-                subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+                # Try to group subjobs into the same command, if their numbers are ajacent
+                if start_idx == -1:
+                    start_idx = i
+                    end_idx = i
+                if i == end_idx + 1:
+                    end_idx += 1
+                else:
+                    # Rerun simulation
+                    command = 'qsub -t ' + str(start_idx+1) + '-' + str(end_idx+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
+                    if args.verbose:
+                        print('Running command: ', command)
+                    subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+                    start_idx = i
+                    end_idx = i
+            
+            # Rerun simulation (last group of subjobs)
+            command = 'qsub -t ' + str(start_idx+1) + '-' + str(end_idx+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
+            if args.verbose:
+                print('Running command: ', command)
+            subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
     else:
         print('No simulations failed.')
 

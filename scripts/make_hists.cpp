@@ -41,6 +41,8 @@
 #include <string>
 #include <fstream>
 
+// #define LPC_uses_Point3D  // Uncomment if rat version is >= 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
+
 bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int evt, std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, double& Delta_T, const bool verbose, const std::string fitName);
 bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, const unsigned int idx, const RAT::DS::EV& evt, std::string fitName);
 void get_t_res(const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time, TH1D& hist);
@@ -309,7 +311,15 @@ bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vec
  * @param hist  time residual histogram to be filled
  */
 void get_t_res(const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time, TH1D& hist) {
-    RAT::DU::Point3D pos(0, position);  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
+
+    // Deal with RAT backwards compatifility
+    #ifdef LPC_uses_Point3D
+        RAT::DU::Point3D pos(0, position);  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
+    #else
+        TVector3 pos = position;
+    #endif
+
+    // Compute time residuals
     const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
     for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); ++iPMT) {
         const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);

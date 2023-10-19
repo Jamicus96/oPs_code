@@ -41,6 +41,8 @@
 #include <string>
 #include <fstream>
 
+// #define LPC_uses_Point3D  // comment if rat version is < 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
+
 void print_info_to_file(const std::vector<std::string>& fileNames, const std::string output_file_address, unsigned int starting_fileNum, bool verbose, std::string fitName="");
 std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& evt, unsigned int evt_idx, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim);
 std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim, std::string fitName);
@@ -201,8 +203,14 @@ std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& 
         // Get event info
         double KE = entry.GetMC().GetMCParticle(evt_idx).GetKineticEnergy();
         double PDG_code = entry.GetMC().GetMCParticle(evt_idx).GetPDGCode();
-        RAT::DU::Point3D pos(0, entry.GetMC().GetMCParticle(evt_idx).GetPosition());  // position of fibre [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
         double GT_time = 390 - entry.GetMCEV(evt_idx).GetGTTime();  // event time is 390ns - GT time.
+
+        // Deal with RAT backwards compatibility
+        #ifdef LPC_uses_Point3D
+            RAT::DU::Point3D pos(0, entry.GetMC().GetMCParticle(evt_idx).GetPosition());  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
+        #else
+            TVector3 pos = entry.GetMC().GetMCParticle(evt_idx).GetPosition();
+        #endif
 
         try {
             // Get classifier info
@@ -268,8 +276,14 @@ std::vector<double> get_recon_info(const RAT::DS::EV& evt, RAT::DU::TimeResidual
         const RAT::DS::FitVertex& rVertex = evt.GetFitResult(fitName).GetVertex(0);
         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) {return output;} // fit invalid
         double energy = rVertex.GetEnergy();
-        RAT::DU::Point3D pos(0, rVertex.GetPosition());  // position of fibre [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
         double vertex_time = rVertex.GetTime();
+
+        // Deal with RAT backwards compatifility
+        #ifdef LPC_uses_Point3D
+            RAT::DU::Point3D pos(0, rVertex.GetPosition());  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
+        #else
+            TVector3 pos = rVertex.GetPosition();
+        #endif
 
         // Get classifier info
         double alphaNreactor_classier_result;
