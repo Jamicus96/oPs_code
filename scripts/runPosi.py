@@ -12,21 +12,21 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--macro', '-m', type=str, dest='macro', help='Which macro to base simulation macros off of.',
-                        default='macros/labppo_2p2_scintillator/AmBe.mac')
+                        default='macros/labppo_2p2_scintillator/flat/IBD_flat.mac')
 
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/sims/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/sims/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/info/', help='Folder to save info text files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/info/', help='Folder to save info text files in.')
     parser.add_argument('--hist_repo', '-hr', type=str, dest='hist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/hists/', help='Folder to save hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/hists/', help='Folder to save hist root files in.')
     parser.add_argument('--tothist_repo', '-tr', type=str, dest='tothist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/beta_timing/tot_hists/', help='Folder to save combined total hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/Positronium/labppo_2p2_scintillator/flat/tot_hists/', help='Folder to save combined total hist root files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
-                        default=241500, help='Number of events to simulate for each setting, total')
+                        default=200000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
-                        default=1000, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
+                        default=500, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-mx', type=int, dest='max_jobs',
                         default=100, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('---step', '-s', type=str, dest='step', required=True, choices=['sim', 'resim', 'info', 'hist', 'combi'],
@@ -35,8 +35,8 @@ def argparser():
                         help='Which number the files are numbered from (for splitting simulations into multiple files for example)')
     
     parser.add_argument('---runNum_list', '-rl', type=str, dest='runNum_list', help='Text file with run numbers to simulate (one per line)',
-                        # default='')
-                        default='run_lists/AmBe.txt')
+                        default='')
+                        # default='run_lists/AmBe.txt')
     parser.add_argument('---use_all_files_in_dir', '-A', type=bool, dest='use_all_files_in_dir',
                         default=False, help='For [info] or [hist] modes. Instead of using the number of events to work out which files to get info from in sim directory, just use all the files in there.')
     
@@ -398,7 +398,7 @@ def reSim(args):
                     end_idx += 1
                 else:
                     # Rerun simulation
-                    command = 'qsub -t ' + str(start_idx+1) + '-' + str(end_idx+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
+                    command = 'qsub -l m_mem_free=4G -t ' + str(start_idx+1) + '-' + str(end_idx+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
                     if args.verbose:
                         print('Running command: ', command)
                     subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
@@ -407,7 +407,7 @@ def reSim(args):
                     end_idx = i
             
             # Rerun simulation (last group of subjobs)
-            command = 'qsub -t ' + str(start_idx+1) + '-' + str(end_idx+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
+            command = 'qsub -l m_mem_free=4G -t ' + str(start_idx+1) + '-' + str(end_idx+1) + ' -tc ' + str(args.max_jobs) + ' ' + new_job_address
             if args.verbose:
                 print('Running command: ', command)
             subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished

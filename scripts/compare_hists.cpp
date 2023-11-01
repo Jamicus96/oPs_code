@@ -98,7 +98,7 @@ int main(){
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ OUTPUT INFO ~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-    TFile fout("compare_AmBe.root", "recreate"); // Create the output file
+    TFile fout("/mnt/lustre/scratch/epp/jp643/antinu/AmBe/new_alpha/compare_AmBe.root", "recreate"); // Create the output file
 
     // Things needed later
     RAT::DB *db = RAT::DB::Get();
@@ -108,7 +108,7 @@ int main(){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ ADD ONE HIST ~~~~~~~~~~~~~~~~~~~~~~~~~ //
     
     // File to read
-    std::string file_address1 = "MC_tothist/tot_hists.root";
+    std::string file_address1 = "/mnt/lustre/scratch/epp/jp643/antinu/AmBe/new_alpha/tot_hists/tot_hists.root";
 
     // Open root file and read in hist
     TFile* f1 = TFile::Open(file_address1.c_str());
@@ -118,7 +118,7 @@ int main(){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ ADD SECOND HIST ~~~~~~~~~~~~~~~~~~~~~~~~~ //
     
     // File to read
-    std::string file_address2 = "data_tothist/tot_hists.root";
+    std::string file_address2 = "/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_tothist/tot_hists.root";
 
     // Open root file and read in hist
     TFile* f2 = TFile::Open(file_address2.c_str());

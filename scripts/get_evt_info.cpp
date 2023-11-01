@@ -41,7 +41,7 @@
 #include <string>
 #include <fstream>
 
-// #define LPC_uses_Point3D  // comment if rat version is < 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
+#define LPC_uses_Point3D  // comment if rat version is < 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
 
 void print_info_to_file(const std::vector<std::string>& fileNames, const std::string output_file_address, unsigned int starting_fileNum, bool verbose, std::string fitName="");
 std::vector<double> get_MC_info(const RAT::DS::Entry& entry, const RAT::DS::EV& evt, unsigned int evt_idx, RAT::DU::TimeResidualCalculator fTRCalc, unsigned int Nbins, double lower_lim, double upper_lim);

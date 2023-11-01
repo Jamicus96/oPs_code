@@ -41,7 +41,7 @@
 #include <string>
 #include <fstream>
 
-// #define LPC_uses_Point3D  // Uncomment if rat version is >= 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
+#define LPC_uses_Point3D  // Uncomment if rat version is >= 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
 
 bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int evt, std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, double& Delta_T, const bool verbose, const std::string fitName);
 bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, const unsigned int idx, const RAT::DS::EV& evt, std::string fitName);
