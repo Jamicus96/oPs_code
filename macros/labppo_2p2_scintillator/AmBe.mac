@@ -1,0 +1,79 @@
+#  File:       AmBesource_exwater.mac
+#  Date:       2022-10-07
+#  Contact:    V Lozza <vlozza@lip.pt>
+#
+#      Macro to be run with a specified event number and run number
+#      (for the external water region)
+#      This mac file is based on the file of the same name for water phase.
+
+/rat/physics_list/OmitMuonicProcesses true
+
+/rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
+/rat/db/set GEO[inner_av] material "labppo_2p2_scintillator" # 2.2 g/L PPO
+
+/rat/db/load geo/calib/AmBeSource_water.geo
+
+/rat/db/set GEO[AmBeSource] mother "cavity"
+/rat/db/set GEO[AmBeSource] relative "av"
+
+# Remove long-lived particles
+/rat/db/set MC event_cutoff_time 1e7
+/rat/db/set MC event_cutoff_nstep 1000  # I added this
+
+# Simulate noise using per-pmt rates
+/rat/db/set NOISE_MC noise_flag 2
+# Read the per-pmt noise rates from the NOISE_RUN_INTEGRATED table
+/rat/db/set NOISE_MC integ_noise_flag 1
+
+# Apply trigger cutoff
+/rat/db/set DAQ apply_cutoff 1
+
+# Set proton timing
+#/rat/db/set OPTICS[labppo_2p2_scintillator] SCINTWAVEFORMproton_value1 [-7.35, -5.45, -117.5, -425.0]  # beta timing
+#/rat/db/set OPTICS[labppo_2p2_scintillator] SCINTWAVEFORMproton_value2 [0.665, 0.218, 0.083, 0.0346]  # beta timing
+
+# Store only the first and last track steps
+/rat/tracking/store condensed
+# Omit tracking for uninteresting particles
+/rat/tracking/omit opticalphoton
+/rat/tracking/omit e-
+
+/run/initialize
+
+########## EVENT LOOP ############
+
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc calibratePMT
+
+/rat/proc datacleaning
+/rat/procset index "scintillator"
+/rat/procset mask "default_apply"
+
+# Apply same reconstruction logic as the processed data
+/rat/proc/if trigTypeSelector
+  # We do not want to process events with the PED trigger - ie the Nhit monitor
+  # Additionally, EXTA events are from optical calibration sources. Don't reconstruct.
+  /rat/procset trigType "Pedestal"
+  /rat/procset trigType "EXTASY"
+
+/rat/proc/else
+
+    /rat/proc scintFitter
+
+/rat/proc/endif           # not ped and EXTASY events
+
+/rat/proc prune
+/rat/procset prune "mc.pmts,mc.hits,mcevs,ev.uncalPMTs,ev.intermedCalPMTs"
+
+/rat/proc outntuple
+/rat/proclast outroot
+
+########## EVENT LOOP ############
+
+/generator/add ambesource  # neutrons and gammas in coincidence
+/generator/rate/set 67.17  # 68.70 * 0.5^(14/432.2) = 67.17 +/- 0.72 neutrons/s [water unidoc]
+
+/rat/run/start
+exit

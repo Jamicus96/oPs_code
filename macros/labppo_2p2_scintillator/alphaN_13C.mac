@@ -7,24 +7,26 @@
 #       Comment out outntuple.
 
 
-# Don't care about hadrons or muons so quicker not to initialise these processes
 /rat/physics_list/OmitMuonicProcesses true
 
 /rat/db/set DETECTOR geo_file "geo/snoplusnative.geo"
 /rat/db/set GEO[inner_av] material "labppo_2p2_scintillator" # 2.2 g/L PPO
 
-#To simulate noise using the per-pmt rates:
+
+# Remove long-lived particles
+/rat/db/set MC event_cutoff_time 1e7
+
+# Simulate noise using per-pmt rates
 /rat/db/set NOISE_MC noise_flag 2
-#To read the per-pmt noise rates from the NOISE_RUN_INTEGRATED table:
+# Read the per-pmt noise rates from the NOISE_RUN_INTEGRATED table:
 /rat/db/set NOISE_MC integ_noise_flag 1
 
-#MC cutoff parameters
-/rat/db/set MC event_cutoff_time 1e9
-/rat/db/set MC event_cutoff_nstep 1000
+# Apply trigger cutoff
+/rat/db/set DAQ apply_cutoff 1
 
 /run/initialize
 
-##########EVENT LOOP############
+########## EVENT LOOP ############
 
 /rat/proc frontend
 /rat/proc trigger
@@ -61,6 +63,7 @@
 
 /rat/proc prune
 /rat/procset prune "mc.pmts,mc.hits,mcevs,ev.uncalPMTs,ev.intermedCalPMTs"
+
 # /rat/proc outntuple
 /rat/proclast outroot
 
@@ -69,7 +72,6 @@
 /generator/add combo alpha_n:fill:poisson
 /generator/vtx/set LAB 13C
 /generator/pos/set 0 0 0
-/generator/rate/set 1.0
 
 /rat/run/start
 exit
