@@ -15,7 +15,10 @@
 #include <RAT/DB.hh>
 #include <TMath.h>
 #include <TVector3.h>
+#include <TLine.h>
 
+#include <string>
+#include <fstream>
 
 
 int main(){
@@ -98,7 +101,7 @@ int main(){
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ OUTPUT INFO ~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-    TFile fout("/mnt/lustre/scratch/epp/jp643/antinu/AmBe/new_alpha/compare_AmBe.root", "recreate"); // Create the output file
+    TFile fout("/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_Nhit/compare_AmBe.root", "recreate"); // Create the output file
 
     // Things needed later
     RAT::DB *db = RAT::DB::Get();
@@ -108,7 +111,7 @@ int main(){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ ADD ONE HIST ~~~~~~~~~~~~~~~~~~~~~~~~~ //
     
     // File to read
-    std::string file_address1 = "/mnt/lustre/scratch/epp/jp643/antinu/AmBe/new_alpha/tot_hists/tot_hists.root";
+    std::string file_address1 = "/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_MC/tothists/tot_hists.root";
 
     // Open root file and read in hist
     TFile* f1 = TFile::Open(file_address1.c_str());
@@ -118,7 +121,7 @@ int main(){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ ADD SECOND HIST ~~~~~~~~~~~~~~~~~~~~~~~~~ //
     
     // File to read
-    std::string file_address2 = "/mnt/lustre/scratch/epp/jp643/antinu/AmBe/data_tothist/tot_hists.root";
+    std::string file_address2 = "/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_Nhit/tothists/tot_hists.root";
 
     // Open root file and read in hist
     TFile* f2 = TFile::Open(file_address2.c_str());
@@ -127,16 +130,35 @@ int main(){
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ MAKE DIFFERENCE HIST ~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-    // Rescale histogram (Assuming they started with the same bins)
-    double x_min = -30.0, x_max = 160.0;
-    unsigned int bin_min = (unsigned int)(h1->GetXaxis()->GetNbins() * (x_min - h1->GetXaxis()->GetXmin()) / (h1->GetXaxis()->GetXmax() - h1->GetXaxis()->GetXmin()));
-    unsigned int bin_max = (unsigned int)(h1->GetXaxis()->GetNbins() * (x_max - h1->GetXaxis()->GetXmin()) / (h1->GetXaxis()->GetXmax() - h1->GetXaxis()->GetXmin()));
-    h1->Scale(h2->Integral(bin_min, bin_max) / h1->Integral(bin_min, bin_max));
+    // Rescale histograms
+    double x_min = -10.0, x_max = 150.0;
+    // unsigned int bin_min1 = (unsigned int)(h1->GetXaxis()->GetNbins() * (x_min - h1->GetXaxis()->GetXmin()) / (h1->GetXaxis()->GetXmax() - h1->GetXaxis()->GetXmin()));
+    // unsigned int bin_max1 = (unsigned int)(h1->GetXaxis()->GetNbins() * (x_max - h1->GetXaxis()->GetXmin()) / (h1->GetXaxis()->GetXmax() - h1->GetXaxis()->GetXmin()));
+    // unsigned int bin_min2 = (unsigned int)(h2->GetXaxis()->GetNbins() * (x_min - h2->GetXaxis()->GetXmin()) / (h2->GetXaxis()->GetXmax() - h2->GetXaxis()->GetXmin()));
+    // unsigned int bin_max2 = (unsigned int)(h2->GetXaxis()->GetNbins() * (x_max - h2->GetXaxis()->GetXmin()) / (h2->GetXaxis()->GetXmax() - h2->GetXaxis()->GetXmin()));
+    h1->Scale(1 / 1670.0);
+    h2->Scale(1 / 1125.0);
 
-    TH1D hdiff(*h2); // TH1F or TH1D, same as h1
+
+    TH1D hdiff(*h1); // TH1F or TH1D, same as h1
     hdiff.SetName("prompt_t_res_data");
     if (!(hdiff.GetSumw2N() > 0)) hdiff.Sumw2(kTRUE); // ensure proper error propagation
-    hdiff.Add(h1, -1.0);
+    // hdiff.Add(h2, -1.0);
+    hdiff.Divide(h2);
+
+    // double x;  // WARNING: DOESN'T WORK PROPERLY
+    // for (unsigned int i = 1; i <= h1->GetXaxis()->GetNbins(); ++i) {
+    //     x = h1->GetBinContent(i);
+    //     if (x < h1->GetXaxis()->GetXmin()) continue;
+    //     if (x > h1->GetXaxis()->GetXmax()) break;
+    //     hdiff.AddBinContent(hdiff.GetXaxis()->FindBin(x), - h1->GetBinContent(h1->GetXaxis()->FindBin(x)));
+
+    //     // bin_diff = hdiff.GetXaxis()->FindBin(x);
+    //     // bin_1 = h1->GetXaxis()->FindBin(x);
+    //     // hdiff.AddBinContent(bin_diff, - h1->GetBinContent(bin_1));
+    //     // hdiff.SetBinContent(bin_diff, hdiff.GetBinContent(bin_diff) / h2->GetBinContent(bin_1));
+    //     // hdiff.SetBinError(bin_diff, hdiff.GetBinError(bin_diff) / h2->GetBinContent(bin_1));
+    // }
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~ FROMAT HISTOGRAMS ~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
@@ -150,7 +172,7 @@ int main(){
     std::string x_label = "t_res (ns)";
     double y_axis_label_offset = 1.0, x_axis_label_offset = 1.0;
 
-    h1->SetTitle("Data vs MC t_res Comparison");
+    h1->SetTitle("AmBe t_res Comparison MC vs Data");
     h1->SetLineColor(kBlue);
     h1->GetYaxis()->SetTitle(y_label.c_str());
     h1->GetYaxis()->SetTitleOffset(y_axis_label_offset);
@@ -158,7 +180,6 @@ int main(){
     h1->GetXaxis()->SetTitleOffset(x_axis_label_offset);
     h1->SetStats(0);
 
-    h1->SetTitle("Data vs MC t_res Comparison");
     h2->SetLineColor(kRed);
     h2->GetYaxis()->SetTitle(y_label.c_str());
     h2->GetYaxis()->SetTitleOffset(y_axis_label_offset);
@@ -168,7 +189,7 @@ int main(){
 
     hdiff.SetTitle("");
     hdiff.SetLineColor(kBlack);
-    hdiff.GetYaxis()->SetTitle("Difference");
+    hdiff.GetYaxis()->SetTitle("Ratio");
     hdiff.GetYaxis()->SetTitleOffset(y_axis_label_offset);
     hdiff.GetXaxis()->SetTitle(x_label.c_str());
     hdiff.GetXaxis()->SetTitleOffset(x_axis_label_offset);
