@@ -41,14 +41,12 @@
 #include <string>
 #include <fstream>
 
-#define LPC_uses_Point3D  // Uncomment if rat version is >= 7.0.11 (the light path calculator uses Point3D instead of Vector3 after this point)
-// #define MC_tagging  // Comment if want to use same tagging as for data
 
 bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int evt, std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<unsigned int>& Nhits,
-                       double& Delta_T, std::vector<TH1D*>& prompt_t_res, RAT::DU::TimeResidualCalculator& fTRCalc, RAT::DU::DetectorStateCorrection& stateCorr, const bool verbose, const std::string hist_name, const std::string fitName);
+                       double& Delta_T, std::ofstream& t_res_file, RAT::DU::TimeResidualCalculator& fTRCalc, RAT::DU::DetectorStateCorrection& stateCorr, const bool verbose, const std::string hist_name, const std::string fitName);
 bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<unsigned int>& Nhits, const unsigned int idx, const RAT::DS::EV& evt, RAT::DU::DetectorStateCorrection& stateCorr, std::string fitName);
-void get_t_res(std::vector<TH1D*>& t_res_hists, const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time, const std::string hist_name);
-void make_hists(const std::vector<std::string>& fileNames, const std::string output_root_address, const std::string output_txt_address, const bool flat_E_prompt, const bool verbose, const std::string fitName = "");
+void get_t_res(std::ofstream& t_res_file, const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time, const std::string hist_name);
+void make_hists(const std::vector<std::string>& fileNames, const std::string output_txt_address, const bool verbose, const std::string fitName = "");
 bool pass_prompt_cuts(const double energy, const unsigned int Nhit, TVector3 position);
 bool pass_delayed_cuts(const double energy, const unsigned int Nhit, TVector3 position);
 bool pass_coincidence_cuts(const double delay, TVector3 prompt_pos, TVector3 delayed_pos);
@@ -57,19 +55,17 @@ bool pass_coincidence_cuts(const double delay, TVector3 prompt_pos, TVector3 del
 /* ~~~~~~~~~~~~~~~~~~~~~~ MAIN FUNCTION ~~~~~~~~~~~~~~~~~~~~~ */
 
 int main(int argc, char** argv) {
-    std::string output_root_address = argv[1];
-    std::string output_txt_address = argv[2];
-    bool flat_E_prompt = std::stoi(argv[3]);  // Whether to flatten the prompt energy spectrum or not
-    bool verbose = std::stoi(argv[4]);
+    std::string output_txt_address = argv[1];
+    bool verbose = std::stoi(argv[2]);
     // Addresses of simulation output files to be analysed
     std::vector<std::string> input_files;
-    for (unsigned int i = 5; i < argc; ++i) {
+    for (unsigned int i = 3; i < argc; ++i) {
         input_files.push_back(argv[i]);
     }
 
     // Loop through files to get info from every event (including t_res), and print all to text file
     if (verbose) {std::cout << "Getting info..." << std::endl;}
-    make_hists(input_files, output_root_address, output_txt_address, flat_E_prompt, verbose);
+    make_hists(input_files, output_txt_address, verbose);
 
     return 0;
 }
@@ -79,14 +75,11 @@ int main(int argc, char** argv) {
 
 const double R_CUT = 5700.0;
 const double MAX_DIST = 1500.0;
-// const double MIN_DELAY = 5500.0, MAX_DELAY = 0.8E6;
 const double MIN_DELAY = 400.0, MAX_DELAY = 0.8E6;
 
-// const double MIN_PROMPT_E = 0.7, MAX_PROMPT_E = 3.5;
 double MIN_PROMPT_E = 0.3, MAX_PROMPT_E = 4.5;
 const unsigned int MIN_PROMPT_Nhit = 200, MAX_PROMPT_Nhit = 850;
 
-// const double MIN_DELAYED_E = 1.4, MAX_DELAYED_E = 2.8;
 const double MIN_DELAYED_E = 1.0, MAX_DELAYED_E = 3.5;
 const unsigned int MIN_DELAYED_Nhit = 510, MAX_DELAYED_Nhit = 750;
 
@@ -151,13 +144,12 @@ bool pass_coincidence_cuts(const double delay, TVector3 prompt_pos, TVector3 del
  * @param verbose  flag
  * @param fitName  name of fitter to get recon info from (default is "")
  */
-void make_hists(const std::vector<std::string>& fileNames, const std::string output_root_address, const std::string output_txt_address, const bool flat_E_prompt, const bool verbose, const std::string fitName) {
+void make_hists(const std::vector<std::string>& fileNames, const std::string output_txt_address, const bool verbose, const std::string fitName) {
     if (verbose) {std::cout << "Running make_hists()" << std::endl;}
 
-    /*********** Setup lists ***********/
-    std::vector<double> prompt_E, prompt_E_unCut, delayed_E, prompt_R, delayed_R, deltaR, deltaT;
-    std::vector<unsigned int> prompt_Nhits, prompt_Nhits_unCut, delayed_Nhits;
-    std::vector<TH1D*> prompt_t_res;
+    /*********** Setup print file ***********/
+    std::ofstream t_res_file;
+    t_res_file.open(output_txt_address);
 
     // Split up prompt energy into N-bins, to flatten spectrum
     unsigned int N_E_bins = 20;
@@ -179,12 +171,6 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
     std::vector<TVector3> pos = {TVector3(0.0, 0.0, 0.0), TVector3(0.0, 0.0, 0.0)};
     double Delta_T = 0.0;
 
-    TH1D hist_prompt_E_unCut("prompt_E_unCut", "prompt_E_unCut", 100, 0.2, 9.0);
-    TH1I hist_prompt_Nhits_unCut("prompt_Nhits_unCut", "prompt_Nhits_unCut", 2010, 9.5, 2000.5);
-
-    TH1D hist_delayed_E_unCut("delayed_E_unCut", "delayed_E_unCut", 100, 0.2, 9.0);
-    TH1I hist_delayed_Nhits_unCut("delayed_Nhits_unCut", "delayed_Nhits_unCut", 2010, 9.5, 2000.5);
-
     // loops through files
     unsigned int idx = 0, E_idx;
     for (unsigned int i = 0; i < fileNames.size(); ++i) {
@@ -202,206 +188,31 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
             // if (verbose) std::cout << "iEntry = " << iEntry << std::endl;
             RAT::DS::Entry rDS = dsReader.GetEntry(iEntry);
 
-            # ifdef MC_tagging
+            // loops through events
+            for (unsigned int iEV = 0; iEV < rDS.GetEVCount(); ++iEV) {
+                if (verbose) std::cout << "iEV = " << iEV << std::endl;
+                RAT::DS::EV rEV = rDS.GetEV(iEV);
 
-                // Only want entries with 2 events (prompt + delayed)
-                if (rDS.GetEVCount() != 2) continue;
+                // if (RAT::EventIsClean(rEV, dcAnalysisWord)) {}
 
-                // Check if prompt and delayed events reconstructed correctly
-                RAT::DS::EV rEV = rDS.GetEV(1);
-                if (!get_recon_info(E, times, pos, Nhits, 1, rEV, fitName)) continue;
-                int64_t delayed_50MHz_time = int64_t(rEV.GetClockCount50());
-                rEV = rDS.GetEV(0);
-                if(!get_recon_info(E, times, pos, Nhits, 0, rEV, fitName)) continue;
-                if (verbose) std::cout << "Events reconstructed correctly! Checking cuts..." << std::endl;
+                // Get recon info, if it exists
+                if (get_recon_info(E, times, pos, Nhits, 1, rEV, stateCorr, fitName)) {
+                    // Check if event passes delayed cuts
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1])) {
+                        if (verbose) std::cout << "Passed delayed cuts! Checking for prompt event..." << std::endl;
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, stateCorr, verbose, std::to_string(idx), fitName)) {
+                            if (verbose) std::cout << "Passed coincidence cuts! Filling histograms..." << std::endl;
 
-                // Fill in prompt uncut values first (only works in MC)
-                hist_prompt_E_unCut.Fill(E[0]);
-                hist_prompt_Nhits_unCut.Fill(Nhits[0]);
-                hist_delayed_E_unCut.Fill(E[1]);
-                hist_delayed_Nhits_unCut.Fill(Nhits[1]);
 
-                // Check if delayed event passes cuts
-                if (!pass_delayed_cuts(E[1], Nhits[1], pos[1])) continue;
-                if (verbose) std::cout << "Passed delayed cuts! Checking prompt cuts..." << std::endl;
-
-                // Check if prompt event passes cuts
-                if (!pass_prompt_cuts(E[0], Nhits[0], pos[0])) continue;
-                if (verbose) std::cout << "Passed prompt cuts! Checking for coincidence cuts..." << std::endl;
-
-                // Check if event pair passes coincidence cuts (tagging)
-                Delta_T = ((delayed_50MHz_time - int64_t(rEV.GetClockCount50())) & 0x7FFFFFFFFFF) * 20.0;
-                if (!pass_coincidence_cuts(Delta_T, pos[0], pos[1])) continue;
-                if (verbose) std::cout << "Passed coincidence cuts! Filling histograms..." << std::endl;
-
-                // Record info
-                prompt_E.push_back(E[0]);                  delayed_E.push_back(E[1]);
-                prompt_R.push_back(pos[0].Mag());          delayed_R.push_back(pos[1].Mag());
-                deltaR.push_back((pos[1] - pos[0]).Mag()); deltaT.push_back(Delta_T);
-                prompt_Nhits.push_back(Nhits[0]);          delayed_Nhits.push_back(Nhits[1]);
-                E_idx = N_E_bins * (E[0] - MIN_PROMPT_E) / (MAX_PROMPT_E - MIN_PROMPT_E);
-                E_indices.at(E_idx).push_back(idx);
-                get_t_res(prompt_t_res, rEV, fTRCalc, pos[0], times[0], std::to_string(idx));
-                ++idx;
-
-            # else
-
-                // loops through events
-                for (unsigned int iEV = 0; iEV < rDS.GetEVCount(); ++iEV) {
-                    if (verbose) std::cout << "iEV = " << iEV << std::endl;
-                    RAT::DS::EV rEV = rDS.GetEV(iEV);
-
-                    // if (RAT::EventIsClean(rEV, dcAnalysisWord)) {}
-
-                    // Get recon info, if it exists
-                    if (get_recon_info(E, times, pos, Nhits, 1, rEV, stateCorr, fitName)) {
-                        // Check if event passes delayed cuts
-                        if (pass_delayed_cuts(E[1], Nhits[1], pos[1])) {
-                            if (verbose) std::cout << "Passed delayed cuts! Checking for prompt event..." << std::endl;
-                            // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
-                            if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, prompt_t_res, fTRCalc, stateCorr, verbose, std::to_string(idx), fitName)) {
-                                if (verbose) std::cout << "Passed coincidence cuts! Filling histograms..." << std::endl;
-
-                                prompt_E.push_back(E[0]);                  delayed_E.push_back(E[1]);
-                                prompt_R.push_back(pos[0].Mag());          delayed_R.push_back(pos[1].Mag());
-                                deltaR.push_back((pos[1] - pos[0]).Mag()); deltaT.push_back(Delta_T);
-                                prompt_Nhits.push_back(Nhits[0]);          delayed_Nhits.push_back(Nhits[1]);
-
-                                E_idx = N_E_bins * (E[0] - MIN_PROMPT_E) / (MAX_PROMPT_E - MIN_PROMPT_E);
-                                E_indices.at(E_idx).push_back(idx);
-                                ++idx;
-                            }
                         }
                     }
                 }
-
-            # endif
+            }
         }
         dsReader.Delete();
     }
-
-    // Find the number of entries in the bin with the least entries
-    unsigned int num_entries = idx + 1;
-    if (flat_E_prompt) {
-        for (unsigned int i = 0; i < N_E_bins; ++i) {
-            if (E_indices.at(i).size() < num_entries) num_entries = E_indices.at(i).size();
-        }
-    }
-
-    /*********** Setup hists ***********/
-    TH1D hist_prompt_t_res("prompt_t_res", "prompt_t_res", 600, -100.5, 499.5);
-    TH1D hist_prompt_E("prompt_E", "prompt_E", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E("delayed_E", "delayed_E", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_R("prompt_R", "prompt_R", 100, 0.0, R_CUT);
-    TH1D hist_delayed_R("delayed_R", "delayed_R", 100, 0.0, R_CUT);
-    TH1I hist_prompt_Nhits("prompt_Nhits", "prompt_Nhits", MAX_PROMPT_Nhit-MIN_PROMPT_Nhit, MIN_PROMPT_Nhit-0.5, MAX_PROMPT_Nhit+0.5);
-    TH1I hist_delayed_Nhits("delayed_Nhits", "delayed_Nhits", MAX_DELAYED_Nhit-MIN_DELAYED_Nhit, MIN_DELAYED_Nhit-0.5, MAX_DELAYED_Nhit+0.5);
-    TH1D hist_deltaR("deltaR", "deltaR", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT("deltaT", "deltaT", 500, MIN_DELAY, MAX_DELAY);
-
-    TH1D hist_prompt_t_res_flat("prompt_t_res_flat", "prompt_t_res", 600, -100.5, 499.5);
-    TH1D hist_prompt_E_flat("prompt_E_flat", "prompt_E", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E_flat("delayed_E_flat", "delayed_E", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_R_flat("prompt_R_flat", "prompt_R", 100, 0.0, R_CUT);
-    TH1D hist_delayed_R_flat("delayed_R_flat", "delayed_R", 100, 0.0, R_CUT);
-    TH1I hist_prompt_Nhits_flat("prompt_Nhits_flat", "prompt_Nhits", MAX_PROMPT_Nhit-MIN_PROMPT_Nhit, MIN_PROMPT_Nhit-0.5, MAX_PROMPT_Nhit+0.);
-    TH1I hist_delayed_Nhits_flat("delayed_Nhits_flat", "delayed_Nhits", MAX_DELAYED_Nhit-MIN_DELAYED_Nhit, MIN_DELAYED_Nhit-0.5, MAX_DELAYED_Nhit+0.5);
-    TH1D hist_deltaR_flat("deltaR_flat", "deltaR", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT_flat("deltaT_flat", "deltaT", 500, MIN_DELAY, MAX_DELAY);
-
-    // Loop through info indices, saved in each E_bin, then fill hists with associated info
-    unsigned int index;
-    std::vector<std::vector<double>> x_vecs;
-    double t_res;
-    for (unsigned int i = 0; i < N_E_bins; ++i) {
-        for (unsigned int j = 0; j < E_indices.at(i).size(); ++j) {
-            index = E_indices.at(i).at(j);
-            // Fill histograms!
-            hist_prompt_E.Fill(prompt_E.at(index));
-            hist_delayed_E.Fill(delayed_E.at(index));
-            hist_prompt_R.Fill(prompt_R.at(index));
-            hist_delayed_R.Fill(delayed_R.at(index));
-            hist_prompt_Nhits.Fill(prompt_Nhits.at(index));
-            hist_delayed_Nhits.Fill(delayed_Nhits.at(index));
-            hist_deltaR.Fill(deltaR.at(index));
-            hist_deltaT.Fill(deltaT.at(index));
-            hist_prompt_t_res.Add(prompt_t_res.at(index));
-
-            if (flat_E_prompt) {
-                // Fill flattened histograms!
-                if (j < num_entries) {
-                    hist_prompt_E_flat.Fill(prompt_E.at(index));
-                    hist_delayed_E_flat.Fill(delayed_E.at(index));
-                    hist_prompt_R_flat.Fill(prompt_R.at(index));
-                    hist_delayed_R_flat.Fill(delayed_R.at(index));
-                    hist_prompt_Nhits_flat.Fill(prompt_Nhits.at(index));
-                    hist_delayed_Nhits_flat.Fill(delayed_Nhits.at(index));
-                    hist_deltaR_flat.Fill(deltaR.at(index));
-                    hist_deltaT_flat.Fill(deltaT.at(index));
-                    hist_prompt_t_res_flat.Add(prompt_t_res.at(index));
-
-                    // Make list of x vectors (166-D) to compute Fisher projection vector a
-                    x_vecs.push_back({});
-                    for (unsigned int k = 1; k < prompt_t_res.at(index)->GetXaxis()->GetNbins(); ++k) {
-                        t_res = prompt_t_res.at(index)->GetXaxis()->GetBinCenter(k);
-                        if (t_res < -15.0) continue;
-                        if (t_res >= 150.0) break;
-                        x_vecs.at(x_vecs.size() - 1).push_back(prompt_t_res.at(index)->GetBinContent(k));
-                    }
-                    x_vecs.at(x_vecs.size() - 1).push_back(prompt_R.at(index));
-                }
-            }
-        }
-    }
-
-    /*********** Open output file, to print info to ***********/
-    TFile rootfile(output_root_address.c_str(), "RECREATE");
-
-    //now write everything
-    rootfile.cd();
-
-    hist_prompt_E.Write();
-    hist_delayed_E.Write();
-    hist_prompt_Nhits.Write();
-    hist_delayed_Nhits.Write();
-    hist_prompt_R.Write();
-    hist_delayed_R.Write();
-    hist_deltaR.Write();
-    hist_deltaT.Write();
-    hist_prompt_t_res.Write();
-
-    # ifdef MC_tagging
-        hist_prompt_E_unCut.Write();
-        hist_prompt_Nhits_unCut.Write();
-        hist_delayed_E_unCut.Write();
-        hist_delayed_Nhits_unCut.Write();
-    # endif
-
-    if (flat_E_prompt) {
-        hist_prompt_E_flat.Write();
-        hist_delayed_E_flat.Write();
-        hist_prompt_R_flat.Write();
-        hist_delayed_R_flat.Write();
-        hist_deltaR_flat.Write();
-        hist_deltaT_flat.Write();
-        hist_prompt_t_res_flat.Write();
-    }
-
-    rootfile.Write();
-    rootfile.Close();
-
-    if (flat_E_prompt) {
-        /*********** Print x-vectors ***********/
-        std::ofstream output_file;
-        output_file.open(output_txt_address);
-        for (unsigned int i = 0; i < x_vecs.size(); ++i) {
-            output_file << x_vecs.at(i).at(0);
-            for (unsigned int j = 1; j < x_vecs.at(i).size(); ++j) {
-                output_file << ", " << x_vecs.at(i).at(j);
-            }
-            output_file << std::endl;
-        }
-    }
+    t_res_file.close();
 }
 
 
@@ -425,7 +236,7 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
  * @return false 
  */
 bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int evt, std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<unsigned int>& Nhits,
-                       double& Delta_T, std::vector<TH1D*>& prompt_t_res, RAT::DU::TimeResidualCalculator& fTRCalc, RAT::DU::DetectorStateCorrection& stateCorr, const bool verbose, const std::string hist_name, const std::string fitName) {
+                       double& Delta_T, std::ofstream& t_res_file, RAT::DU::TimeResidualCalculator& fTRCalc, RAT::DU::DetectorStateCorrection& stateCorr, const bool verbose, const std::string hist_name, const std::string fitName) {
 
     RAT::DS::Entry rDS = dsReader.GetEntry(entry);
     RAT::DS::EV rEV = rDS.GetEV(evt);
@@ -456,7 +267,7 @@ bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int e
                     if (verbose) std::cout << "Passed prompt cuts! Checking coincidence cuts..." << std::endl;
                     if (pass_coincidence_cuts(Delta_T, pos[0], pos[1])) {
                         // Also get time residuals while at it
-                        get_t_res(prompt_t_res, rEV, fTRCalc, pos[0], times[0], hist_name);
+                        get_t_res(t_res_file, rEV, fTRCalc, pos[0], times[0], hist_name);
                         return true;
                     }
                 }
@@ -496,14 +307,9 @@ bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vec
         times[idx] = rVertex.GetTime();
         pos[idx] = rVertex.GetPosition();
 
-        // Deal with RAT backwards compatifility
-        #ifdef LPC_uses_Point3D
-            RAT::DU::Point3D position(0, pos[idx]);  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
-            // Get Nhits, and correct for position coverage dependence
-            Nhits[idx] = evt.GetNhitsCleaned() / stateCorr.GetCorrectionPos(position, 0, 0);
-        #else
-            Nhits[idx] = evt.GetNhitsCleaned();
-        #endif
+        RAT::DU::Point3D position(0, pos[idx]);  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
+        // Get Nhits, and correct for position coverage dependence
+        Nhits[idx] = evt.GetNhitsCleaned() / stateCorr.GetCorrectionPos(position, 0, 0);
     }
     catch (const RAT::DS::DataNotFound&) {return false;}  // no fit data
     catch (const RAT::DS::FitCollection::NoResultError&) {return false;} // no fit result by the name of fitName
@@ -523,23 +329,16 @@ bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vec
  * @param vertex_time  prompt event recon time
  * @param hist  time residual histogram to be filled
  */
-void get_t_res(std::vector<TH1D*>& t_res_hists, const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time, const std::string hist_name) {
+void get_t_res(std::ofstream& t_res_file, const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time, const std::string hist_name) {
 
-    t_res_hists.push_back(new TH1D(hist_name.c_str(), hist_name.c_str(), 600, -100.5, 499.5));
-
-    // Deal with RAT backwards compatifility
-    #ifdef LPC_uses_Point3D
-        RAT::DU::Point3D pos(0, position);  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
-    #else
-        TVector3 pos = position;
-    #endif
+    RAT::DU::Point3D pos(0, position);  // position of event [mm] (as Point3D in PSUP coordinates, see system_id in POINT3D_SHIFTS tables)
 
     // Compute time residuals
     const RAT::DS::CalPMTs& calibratedPMTs = evt.GetCalPMTs();
     for (size_t iPMT = 0; iPMT < calibratedPMTs.GetCount(); ++iPMT) {
         const RAT::DS::PMTCal& pmtCal = calibratedPMTs.GetPMT(iPMT);
         // Use new time residual calculator
-        t_res_hists.at(t_res_hists.size() - 1)->Fill(fTRCalc.CalcTimeResidual(pmtCal, pos, vertex_time));
+        t_res_file << fTRCalc.CalcTimeResidual(pmtCal, pos, vertex_time) << ", ";
     }
 }
 
