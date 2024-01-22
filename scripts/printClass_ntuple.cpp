@@ -12,10 +12,13 @@
 
 
 // define max delay, since it gets used twice (for consistency)
-double MIN_PROMPT_E = 0.9, MAX_PROMPT_E = 3.5;
-double MIN_DELAYED_E = 1.85, MAX_DELAYED_E = 2.4;
-double MAX_DELAY = 0.8E6;
-double R_CUT = 5700;
+const double MIN_PROMPT_E = 0.9, MAX_PROMPT_E = 3.5;
+const double MIN_DELAYED_E = 1.85, MAX_DELAYED_E = 2.4;
+const double MAX_DELAY = 0.8E6;
+const double R_CUT = 5700;
+
+const bool APPLY_CLASSIFIER = true;
+const double CLASS_CUT = -8.66;
 
 
 bool pass_prompt_cuts(double energy, TVector3 position) {
@@ -52,7 +55,7 @@ bool pass_coincidence_cuts(double delay, TVector3 prompt_pos, TVector3 delayed_p
  * @param EventInfo  event tree from ntuple.
  * @return TH1D*
  */
-void Apply_tagging_and_cuts(TTree* EventInfo, std::vector<double>& class_results, std::vector<TH1D*>& hists, std::string hist_name_start) {
+void Apply_tagging_and_cuts(TTree* EventInfo, std::vector<double>& class_results, std::vector<double>& recon_E, std::vector<double>& recon_R, std::vector<TH1D*>& hists, std::string hist_name_start) {
 
     /* ~~~~~~~ Set up histograms ~~~~~~~ */
 
@@ -130,6 +133,8 @@ void Apply_tagging_and_cuts(TTree* EventInfo, std::vector<double>& class_results
 
                 promptPos = TVector3(reconX, reconY, reconZ);
                 if (valid and pass_prompt_cuts(reconEnergy, promptPos) and pass_coincidence_cuts(delay, promptPos, delayedPos)) {
+                    if (APPLY_CLASSIFIER && (classResult < CLASS_CUT)) continue; // Classifier cut
+                    
                     // Event pair survived analysis cuts
                     nvalid++;
 
@@ -137,7 +142,7 @@ void Apply_tagging_and_cuts(TTree* EventInfo, std::vector<double>& class_results
                     hists.at(0)->Fill(reconEnergy);
                     hists.at(1)->Fill(delayedEnergy);
                     hists.at(2)->Fill(promptPos.Mag());
-                    hists.at(3)->Fill(promptPos.Mag());
+                    hists.at(3)->Fill(delayedPos.Mag());
                     hists.at(4)->Fill(NhitsCleaned);
                     hists.at(5)->Fill(delayedNhitsCleaned);
                     hists.at(6)->Fill((promptPos - delayedPos).Mag());
@@ -146,6 +151,8 @@ void Apply_tagging_and_cuts(TTree* EventInfo, std::vector<double>& class_results
 
                     // Fill vector (to print to txt file, for easier use)
                     class_results.push_back(classResult);
+                    recon_E.push_back(reconEnergy);
+                    recon_R.push_back(promptPos.Mag());
                 }
             }
         }
@@ -171,12 +178,16 @@ int main(int argv, char** argc) {
     // Loop through and apply tagging + cuts
     std::cout << "Looping through reactor IBD events..." << std::endl; 
     std::vector<double> IBD_class_res;
+    std::vector<double> IBD_recon_E;
+    std::vector<double> IBD_recon_R;
     std::vector<TH1D*> IBD_hists;
-    Apply_tagging_and_cuts(reactorEventTree, IBD_class_res, IBD_hists, "IBD_");
+    Apply_tagging_and_cuts(reactorEventTree, IBD_class_res, IBD_recon_E, IBD_recon_R, IBD_hists, "IBD_");
     std::cout << "Looping through alpha-n events..." << std::endl; 
     std::vector<double> alphaN_class_res;
+    std::vector<double> alphaN_recon_E;
+    std::vector<double> alphaN_recon_R;
     std::vector<TH1D*> alphaN_hists;
-    Apply_tagging_and_cuts(alphaNEventTree, alphaN_class_res, alphaN_hists, "alphaN_");
+    Apply_tagging_and_cuts(alphaNEventTree, alphaN_class_res, alphaN_recon_E, alphaN_recon_R, alphaN_hists, "alphaN_");
 
     // Write hists to root file
     TFile rootfile(outRoot_address.c_str(), "RECREATE");
@@ -194,16 +205,14 @@ int main(int argv, char** argc) {
     std::ofstream output_file;
     output_file.open(outText_address);
 
-    output_file << IBD_class_res.at(0);
-    for (unsigned int i = 1; i < IBD_class_res.size(); ++i) {
-        output_file << ", " << IBD_class_res.at(i);
+    output_file << "# E R Class" << std::endl;
+    for (unsigned int i = 0; i < IBD_class_res.size(); ++i) {
+        output_file << IBD_recon_E.at(i) << " " << IBD_recon_R.at(i) << " " << IBD_class_res.at(i) << std::endl;
     }
-    output_file << std::endl;
-    output_file << alphaN_class_res.at(0);
-    for (unsigned int i = 1; i < alphaN_class_res.size(); ++i) {
-        output_file << ", " << alphaN_class_res.at(i);
+    output_file << "# IBD above, alpha-n below." << std::endl;
+    for (unsigned int i = 0; i < alphaN_class_res.size(); ++i) {
+        output_file << alphaN_recon_E.at(i) << " " << alphaN_recon_R.at(i) << " " << alphaN_class_res.at(i) << std::endl;
     }
-    output_file << std::endl;
 
     return 0;
 }

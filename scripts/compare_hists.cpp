@@ -226,6 +226,21 @@ int main(){
     c1.Write();  // Write canvas to root file
     h1->Write(); h2->Write(); hdiff.Write();  // Write histograms to root file too
     fout.Close();
+
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~ PRINT STUFF ~~~~~~~~~~~~~~~~~~~~~~~~~ //
+
+    x_min = -30.0; x_max = 200.0;
+    unsigned int bin_min2 = (unsigned int)(h2->GetXaxis()->GetNbins() * (x_min - h2->GetXaxis()->GetXmin()) / (h2->GetXaxis()->GetXmax() - h2->GetXaxis()->GetXmin()));
+    unsigned int bin_max2 = (unsigned int)(h2->GetXaxis()->GetNbins() * (x_max - h2->GetXaxis()->GetXmin()) / (h2->GetXaxis()->GetXmax() - h2->GetXaxis()->GetXmin()));
+
+    std::ofstream output_file;
+    output_file.open("/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_Nhit/t_res.txt");
+    for (unsigned int i = bin_min2+1; i < bin_max2+2; ++i) {
+        output_file << h2->GetXaxis()->GetBinCenter(i) << " ";
+        output_file << h2->GetBinContent(i) << std::endl;
+    }
+    output_file.close();
     
     return 0;
 }

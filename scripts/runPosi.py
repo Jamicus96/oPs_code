@@ -45,6 +45,8 @@ def argparser():
                         default=True, help='For [info] or [hist] modes. Instead of using the number of events to work out which files to get info from in sim directory, just use all the files in there.')
     parser.add_argument('---flat', '-f', type=bool, dest='flat',
                         default=False, help='True if you want to also produce the same histograms, but where the prompt E spectra have been flattened.')
+    parser.add_argument('---is_data', '-iD', type=bool, dest='is_data',
+                        default=False, help='For energy correction: True for data, False for MC.')
     
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                         default=False, help='print and save extra info')
@@ -554,7 +556,7 @@ def getHists(args):
         for i in range(len(file_addresses)):
             outRoot_address = out_address_start + '_' + str(i) + '.root '
             outText_address = out_address_start + '_' + str(i) + '.txt '
-            commands.append(command_base + outRoot_address + outText_address + str(int(args.flat)) + ' ' + str(int(args.verbose)) + file_addresses[i] + '\n')
+            commands.append(command_base + outRoot_address + outText_address + str(int(args.flat)) + ' ' + str(int(args.is_data)) + ' ' + str(int(args.verbose)) + file_addresses[i] + '\n')
         
         # Create the job script to run all these commands in a file
         with open(commandList_address, 'w') as f:
