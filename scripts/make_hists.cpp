@@ -42,13 +42,17 @@
 #include <fstream>
 
 
+// #define PRINT_T_RES
+
 bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int evt, std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<double>& Nhits,
-                       double& Delta_T, std::ofstream& t_res_file, RAT::DU::TimeResidualCalculator& fTRCalc, const RAT::DU::ReconCalibrator& e_cal, RAT::DU::DetectorStateCorrection& stateCorr, bool is_data, const bool verbose, const std::string fitName);
-bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<double>& Nhits, const unsigned int idx, const RAT::DS::EV& evt, const RAT::DU::ReconCalibrator& e_cal, RAT::DU::DetectorStateCorrection& stateCorr, bool is_data, std::string fitName);
+                       double& Delta_T, std::ofstream& t_res_file, RAT::DU::TimeResidualCalculator& fTRCalc, const RAT::DU::ReconCalibrator& e_cal, RAT::DU::DetectorStateCorrection& stateCorr,
+                       bool is_data, const bool verbose, const bool use_pos_dep_corr, const bool use_Nhit, const bool cut_R_min);
+bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<double>& Nhits, const unsigned int idx, const RAT::DS::EV& evt, const RAT::DU::ReconCalibrator& e_cal,
+                    RAT::DU::DetectorStateCorrection& stateCorr, bool is_data, const bool use_pos_dep_corr);
 void get_t_res(std::ofstream& t_res_file, const RAT::DS::EV& evt, RAT::DU::TimeResidualCalculator& fTRCalc, const TVector3& position, const double vertex_time);
 void make_hists(const std::vector<std::string>& fileNames, const std::string output_root_address, const std::string output_txt_address, bool is_data, const bool verbose, const std::string fitName = "");
-bool pass_prompt_cuts(const double energy, const double Nhit, TVector3 position);
-bool pass_delayed_cuts(const double energy, const double Nhit, TVector3 position);
+bool pass_prompt_cuts(const double energy, const double Nhit, TVector3 position, const bool use_Nhit, const bool cut_R_min);
+bool pass_delayed_cuts(const double energy, const double Nhit, TVector3 position, const bool use_Nhit, const bool cut_R_min);
 bool pass_coincidence_cuts(const double delay, TVector3 prompt_pos, TVector3 delayed_pos);
 
 
@@ -76,23 +80,22 @@ int main(int argc, char** argv) {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~ CUT FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~ */
 
-const double R_MIN = 0.0, R_MAX = 5700.0;
+const double R_MIN = 4000.0, R_MAX = 5700.0;
 const double MAX_DIST = 1500.0;
 // const double MIN_DELAY = 5500.0, MAX_DELAY = 0.8E6;
-const double MIN_DELAY = 400.0, MAX_DELAY = 0.8E6;
+const double MIN_DELAY = 500.0, MAX_DELAY = 0.8E6;
 
-// const double MIN_PROMPT_E = 0.7, MAX_PROMPT_E = 3.5;
-double MIN_PROMPT_E = 0.3, MAX_PROMPT_E = 4.5;
-const double MIN_PROMPT_Nhit = 120.0, MAX_PROMPT_Nhit = 680.0;
+const double MIN_PROMPT_E = 0.7, MAX_PROMPT_E = 3.5;
+// double MIN_PROMPT_E = 0.3, MAX_PROMPT_E = 4.5;
+const double MIN_PROMPT_Nhit = 150.0, MAX_PROMPT_Nhit = 700.0;
 
-// const double MIN_DELAYED_E = 1.4, MAX_DELAYED_E = 2.8;
-const double MIN_DELAYED_E = 1.0, MAX_DELAYED_E = 3.5;
-const double MIN_DELAYED_Nhit = 350.0, MAX_DELAYED_Nhit = 600.0;
+const double MIN_DELAYED_E = 1.8, MAX_DELAYED_E = 2.5;
+// const double MIN_DELAYED_E = 1.0, MAX_DELAYED_E = 3.5;
+const double MIN_DELAYED_Nhit = 400.0, MAX_DELAYED_Nhit = 620.0;
 
-const bool USE_NHIT = true;
 
-bool pass_prompt_cuts(const double energy, const double Nhit, TVector3 position) {
-    if (USE_NHIT) {
+bool pass_prompt_cuts(const double energy, const double Nhit, TVector3 position, const bool use_Nhit, const bool cut_R_min) {
+    if (use_Nhit) {
         if (Nhit < MIN_PROMPT_Nhit) return false;  // min Nhit cut
         if (Nhit > MAX_PROMPT_Nhit) return false;  // max Nhit cut
     } else {
@@ -100,13 +103,13 @@ bool pass_prompt_cuts(const double energy, const double Nhit, TVector3 position)
         if (energy > MAX_PROMPT_E) return false;  // max energy cut (MeV)
     }
     if (position.Mag() > R_MAX) return false;  // FV cut (mm)
-    if (position.Mag() < R_MIN) return false;  // FV cut (mm)
+    if (cut_R_min && (position.Mag() < R_MIN)) return false;  // FV cut (mm)
 
     return true;
 }
 
-bool pass_delayed_cuts(const double energy, const double Nhit, TVector3 position) {
-    if (USE_NHIT) {
+bool pass_delayed_cuts(const double energy, const double Nhit, TVector3 position, const bool use_Nhit, const bool cut_R_min) {
+    if (use_Nhit) {
         if (Nhit < MIN_DELAYED_Nhit) return false;  // min Nhit cut
         if (Nhit > MAX_DELAYED_Nhit) return false;  // max Nhit cut
     } else {
@@ -114,7 +117,7 @@ bool pass_delayed_cuts(const double energy, const double Nhit, TVector3 position
         if (energy > MAX_DELAYED_E) return false;  // max energy cut (MeV)
     }
     if (position.Mag() > R_MAX) return false;  // FV cut (mm)
-    if (position.Mag() < R_MIN) return false;  // FV cut (mm)
+    if (cut_R_min && (position.Mag() < R_MIN)) return false;  // FV cut (mm)
 
     return true;
 }
@@ -160,47 +163,90 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
     t_res_file.open(output_txt_address);
 
     /*********** Set histograms ***********/
-    TH1D hist_prompt_E("prompt_E", "prompt_E", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E("delayed_E", "delayed_E", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_R("prompt_R", "prompt_R", 100, R_MIN, R_MAX);
-    TH1D hist_delayed_R("delayed_R", "delayed_R", 100, R_MIN, R_MAX);
-    TH1D hist_prompt_Nhits("prompt_Nhits", "prompt_Nhits", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_delayed_Nhits("delayed_Nhits", "delayed_Nhits", 100, MIN_DELAYED_Nhit, MAX_DELAYED_Nhit);
-    TH1D hist_deltaR("deltaR", "deltaR", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT("deltaT", "deltaT", 100, MIN_DELAY, MAX_DELAY);
+    const double min_delayed_E = 1.0, max_delayed_E = 3.5, min_prompt_E = 0.3, max_prompt_E = 4.5;
+    const double min_delayed_Nhit = 200.0, max_delayed_Nhit = 800.0, min_prompt_Nhit = 100.0, max_prompt_Nhit = 900.0;
+    const double min_R = 0.0, max_R = R_MAX, min_deltaT = MIN_DELAY, max_deltaT = MAX_DELAY, min_deltaR = 0.0, max_deltaR = MAX_DIST;
 
-    TH1D hist_prompt_E_54R("prompt_E_5.4<R", "prompt_E_5.4<R", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E_54R("delayed_E_5.4<R", "delayed_E_5.4<R", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_Nhits_54R("prompt_Nhits_5.4<R", "prompt_Nhits_5.4<R", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_delayed_Nhits_54R("delayed_Nhits_5.4<R", "delayed_Nhits_5.4<R", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_deltaR_54R("deltaR_5.4<R", "deltaR_5.4<R", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT_54R("deltaT_5.4<R", "deltaT_5.4<R", 100, MIN_DELAY, MAX_DELAY);
+    // nhit cuts, no R cut, no pos dep corr
+    TH1D hist_prompt_E_NhitCut_noRcut_noPosDepCorr("prompt_E_NhitCut-noRcut-noPosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_NhitCut_noRcut_noPosDepCorr("delayed_E_NhitCut-noRcut-noPosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_NhitCut_noRcut_noPosDepCorr("prompt_R_NhitCut-noRcut-noPosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_NhitCut_noRcut_noPosDepCorr("delayed_R_NhitCut-noRcut-noPosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_NhitCut_noRcut_noPosDepCorr("prompt_Nhits_NhitCut-noRcut-noPosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_NhitCut_noRcut_noPosDepCorr("delayed_Nhits_NhitCut-noRcut-noPosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_NhitCut_noRcut_noPosDepCorr("deltaR_NhitCut-noRcut-noPosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_NhitCut_noRcut_noPosDepCorr("deltaT_NhitCut-noRcut-noPosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
 
-    TH1D hist_prompt_E_4R54("prompt_E_4<R<5.4", "prompt_E_4<R<5.4", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E_4R54("delayed_E_4<R<5.4", "delayed_E_4<R<5.4", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_Nhits_4R54("prompt_Nhits_4<R<5.4", "prompt_Nhits_4<R<5.4", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_delayed_Nhits_4R54("delayed_Nhits_4<R<5.4", "delayed_Nhits_4<R<5.4", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_deltaR_4R54("deltaR_4<R<5.4", "deltaR_4<R<5.4", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT_4R54("deltaT_4<R<5.4", "deltaT_4<R<5.4", 100, MIN_DELAY, MAX_DELAY);
+    // E cuts, no R cut, no pos dep corr
+    TH1D hist_prompt_E_ECut_noRcut_noPosDepCorr("prompt_E_ECut-noRcut-noPosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_ECut_noRcut_noPosDepCorr("delayed_E_ECut-noRcut-noPosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_ECut_noRcut_noPosDepCorr("prompt_R_ECut-noRcut-noPosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_ECut_noRcut_noPosDepCorr("delayed_R_ECut-noRcut-noPosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_ECut_noRcut_noPosDepCorr("prompt_Nhits_ECut-noRcut-noPosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_ECut_noRcut_noPosDepCorr("delayed_Nhits_ECut-noRcut-noPosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_ECut_noRcut_noPosDepCorr("deltaR_ECut-noRcut-noPosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_ECut_noRcut_noPosDepCorr("deltaT_ECut-noRcut-noPosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
 
-    TH1D hist_prompt_E_R4("prompt_E_R<4", "prompt_E_R<4", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E_R4("delayed_E_R<4", "delayed_E_R<4", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_Nhits_R4("prompt_Nhits_R<4", "prompt_Nhits_R<4", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_delayed_Nhits_R4("delayed_Nhits_R<4", "delayed_Nhits_R<4", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_deltaR_R4("deltaR_R<4", "deltaR_R<4", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT_R4("deltaT_R<4", "deltaT_R<4", 100, MIN_DELAY, MAX_DELAY);
+    // nhit cuts, R cut, no pos dep corr
+    TH1D hist_prompt_E_NhitCut_Rcut_noPosDepCorr("prompt_E_NhitCut-Rcut-noPosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_NhitCut_Rcut_noPosDepCorr("delayed_E_NhitCut-Rcut-noPosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_NhitCut_Rcut_noPosDepCorr("prompt_R_NhitCut-Rcut-noPosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_NhitCut_Rcut_noPosDepCorr("delayed_R_NhitCut-Rcut-noPosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_NhitCut_Rcut_noPosDepCorr("prompt_Nhits_NhitCut-Rcut-noPosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_NhitCut_Rcut_noPosDepCorr("delayed_Nhits_NhitCut-Rcut-noPosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_NhitCut_Rcut_noPosDepCorr("deltaR_NhitCut-Rcut-noPosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_NhitCut_Rcut_noPosDepCorr("deltaT_NhitCut-Rcut-noPosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
 
-    TH1D hist_prompt_E_rest("prompt_E_rest", "prompt_E_rest", 100, MIN_PROMPT_E, MAX_PROMPT_E);
-    TH1D hist_delayed_E_rest("delayed_E_rest", "delayed_E_rest", 100, MIN_DELAYED_E, MAX_DELAYED_E);
-    TH1D hist_prompt_Nhits_rest("prompt_Nhits_rest", "prompt_Nhits_rest", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_delayed_Nhits_rest("delayed_Nhits_rest", "delayed_Nhits_rest", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit);
-    TH1D hist_deltaR_rest("deltaR_rest", "deltaR_rest", 100, 0.0, MAX_DIST);
-    TH1D hist_deltaT_rest("deltaT_rest", "deltaT_rest", 100, MIN_DELAY, MAX_DELAY);
+    // E cuts, R cut, no pos dep corr
+    TH1D hist_prompt_E_ECut_Rcut_noPosDepCorr("prompt_E_ECut-Rcut-noPosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_ECut_Rcut_noPosDepCorr("delayed_E_ECut-Rcut-noPosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_ECut_Rcut_noPosDepCorr("prompt_R_ECut-Rcut-noPosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_ECut_Rcut_noPosDepCorr("delayed_R_ECut-Rcut-noPosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_ECut_Rcut_noPosDepCorr("prompt_Nhits_ECut-Rcut-noPosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_ECut_Rcut_noPosDepCorr("delayed_Nhits_ECut-Rcut-noPosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_ECut_Rcut_noPosDepCorr("deltaR_ECut-Rcut-noPosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_ECut_Rcut_noPosDepCorr("deltaT_ECut-Rcut-noPosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
 
-    TH2D hist_prompt_E_vs_R("prompt_E_vs_R", "prompt_E_vs_R", 100, MIN_PROMPT_E, MAX_PROMPT_E, 100, R_MIN, R_MAX);
-    TH2D hist_delayed_E_vs_R("delayed_E_vs_R", "delayed_E_vs_R", 100, MIN_DELAYED_E, MAX_DELAYED_E, 100, R_MIN, R_MAX);
-    TH2D hist_prompt_Nhits_vs_R("prompt_Nhits_vs_R", "prompt_Nhits_vs_R", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit, 100, R_MIN, R_MAX);
-    TH2D hist_delayed_Nhits_vs_R("delayed_Nhits_vs_R", "delayed_Nhits_vs_R", 100, MIN_PROMPT_Nhit, MAX_PROMPT_Nhit, 100, R_MIN, R_MAX);
+    // nhit cuts, no R cut, pos dep corr
+    TH1D hist_prompt_E_NhitCut_noRcut_PosDepCorr("prompt_E_NhitCut-noRcut-PosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_NhitCut_noRcut_PosDepCorr("delayed_E_NhitCut-noRcut-PosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_NhitCut_noRcut_PosDepCorr("prompt_R_NhitCut-noRcut-PosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_NhitCut_noRcut_PosDepCorr("delayed_R_NhitCut-noRcut-PosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_NhitCut_noRcut_PosDepCorr("prompt_Nhits_NhitCut-noRcut-PosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_NhitCut_noRcut_PosDepCorr("delayed_Nhits_NhitCut-noRcut-PosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_NhitCut_noRcut_PosDepCorr("deltaR_NhitCut-noRcut-PosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_NhitCut_noRcut_PosDepCorr("deltaT_NhitCut-noRcut-PosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
+
+    // E cuts, no R cut, pos dep corr
+    TH1D hist_prompt_E_ECut_noRcut_PosDepCorr("prompt_E_ECut-noRcut-PosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_ECut_noRcut_PosDepCorr("delayed_E_ECut-noRcut-PosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_ECut_noRcut_PosDepCorr("prompt_R_ECut-noRcut-PosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_ECut_noRcut_PosDepCorr("delayed_R_ECut-noRcut-PosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_ECut_noRcut_PosDepCorr("prompt_Nhits_ECut-noRcut-PosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_ECut_noRcut_PosDepCorr("delayed_Nhits_ECut-noRcut-PosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_ECut_noRcut_PosDepCorr("deltaR_ECut-noRcut-PosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_ECut_noRcut_PosDepCorr("deltaT_ECut-noRcut-PosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
+
+    // nhit cuts, R cut, pos dep corr
+    TH1D hist_prompt_E_NhitCut_Rcut_PosDepCorr("prompt_E_NhitCut-Rcut-PosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_NhitCut_Rcut_PosDepCorr("delayed_E_NhitCut-Rcut-PosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_NhitCut_Rcut_PosDepCorr("prompt_R_NhitCut-Rcut-PosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_NhitCut_Rcut_PosDepCorr("delayed_R_NhitCut-Rcut-PosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_NhitCut_Rcut_PosDepCorr("prompt_Nhits_NhitCut-Rcut-PosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_NhitCut_Rcut_PosDepCorr("delayed_Nhits_NhitCut-Rcut-PosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_NhitCut_Rcut_PosDepCorr("deltaR_NhitCut-Rcut-PosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_NhitCut_Rcut_PosDepCorr("deltaT_NhitCut-Rcut-PosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
+
+    // E cuts, R cut, pos dep corr
+    TH1D hist_prompt_E_ECut_Rcut_PosDepCorr("prompt_E_ECut-Rcut-PosDepCorr", "prompt_E", 100, min_prompt_E, max_prompt_E);
+    TH1D hist_delayed_E_ECut_Rcut_PosDepCorr("delayed_E_ECut-Rcut-PosDepCorr", "delayed_E", 100, min_delayed_E, max_delayed_E);
+    TH1D hist_prompt_R_ECut_Rcut_PosDepCorr("prompt_R_ECut-Rcut-PosDepCorr", "prompt_R", 100, min_R, max_R);
+    TH1D hist_delayed_R_ECut_Rcut_PosDepCorr("delayed_R_ECut-Rcut-PosDepCorr", "delayed_R", 100, min_R, max_R);
+    TH1D hist_prompt_Nhits_ECut_Rcut_PosDepCorr("prompt_Nhits_ECut-Rcut-PosDepCorr", "prompt_Nhits", 100, min_prompt_Nhit, max_prompt_Nhit);
+    TH1D hist_delayed_Nhits_ECut_Rcut_PosDepCorr("delayed_Nhits_ECut-Rcut-PosDepCorr", "delayed_Nhits", 100, min_delayed_Nhit, max_delayed_Nhit);
+    TH1D hist_deltaR_ECut_Rcut_PosDepCorr("deltaR_ECut-Rcut-PosDepCorr", "deltaR", 100, min_deltaR, max_deltaR);
+    TH1D hist_deltaT_ECut_Rcut_PosDepCorr("deltaT_ECut-Rcut-PosDepCorr", "deltaT", 100, min_deltaT, max_deltaT);
+
 
     // RAT::DB::Get()->SetAirplaneModeStatus(true);
     RAT::DU::TimeResidualCalculator fTRCalc = RAT::DU::Utility::Get()->GetTimeResidualCalculator();
@@ -242,61 +288,133 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
                 // if (RAT::EventIsClean(rEV, dcAnalysisWord)) {}
 
                 // Get recon info, if it exists
-                if (get_recon_info(E, times, pos, Nhits, 1, rEV, e_cal, stateCorr, is_data, fitName)) {
-                    // Check if event passes delayed cuts
-                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1])) {
-                        if (verbose) std::cout << "Passed delayed cuts! Checking for prompt event..." << std::endl;
+                if (get_recon_info(E, times, pos, Nhits, 1, rEV, e_cal, stateCorr, is_data, false)) {
+                    // nhit cuts, no R cut, no pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], true, false)) {
                         // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
-                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, fitName)) {
-                            if (verbose) std::cout << "Passed coincidence cuts! Filling histograms..." << std::endl;
-                            // original hists
-                            hist_prompt_E.Fill(E[0]);
-                            hist_delayed_E.Fill(E[1]);
-                            hist_prompt_R.Fill(pos[0].Mag());
-                            hist_delayed_R.Fill(pos[1].Mag());
-                            hist_prompt_Nhits.Fill(Nhits[0]);
-                            hist_delayed_Nhits.Fill(Nhits[1]);
-                            hist_deltaR.Fill((pos[1] - pos[0]).Mag());
-                            hist_deltaT.Fill(Delta_T);
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, false, true, false)) {
+                            hist_prompt_E_NhitCut_noRcut_noPosDepCorr.Fill(E[0]);
+                            hist_delayed_E_NhitCut_noRcut_noPosDepCorr.Fill(E[1]);
+                            hist_prompt_R_NhitCut_noRcut_noPosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_NhitCut_noRcut_noPosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_NhitCut_noRcut_noPosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_NhitCut_noRcut_noPosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_NhitCut_noRcut_noPosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_NhitCut_noRcut_noPosDepCorr.Fill(Delta_T);
 
-                            // 2D hists
-                            hist_prompt_E_vs_R.Fill(E[0], pos[0].Mag());
-                            hist_delayed_E_vs_R.Fill(E[1], pos[1].Mag());
-                            hist_prompt_Nhits_vs_R.Fill(Nhits[0], pos[0].Mag());
-                            hist_delayed_Nhits_vs_R.Fill(Nhits[1], pos[1].Mag());
-
-                            // FV cut hists
-                            if ((pos[0].Mag() > 5400.0) && (pos[1].Mag() > 5400.0)) {
-                                hist_prompt_E_54R.Fill(E[0]);
-                                hist_delayed_E_54R.Fill(E[1]);
-                                hist_prompt_Nhits_54R.Fill(Nhits[0]);
-                                hist_delayed_Nhits_54R.Fill(Nhits[1]);
-                                hist_deltaR_54R.Fill((pos[1] - pos[0]).Mag());
-                                hist_deltaT_54R.Fill(Delta_T);
-                            } else if ((pos[0].Mag() <= 5400.0) && (pos[1].Mag() <= 5400.0) && (pos[0].Mag() > 4000.0) && (pos[1].Mag() > 4000.0)) {
-                                hist_prompt_E_4R54.Fill(E[0]);
-                                hist_delayed_E_4R54.Fill(E[1]);
-                                hist_prompt_Nhits_4R54.Fill(Nhits[0]);
-                                hist_delayed_Nhits_4R54.Fill(Nhits[1]);
-                                hist_deltaR_4R54.Fill((pos[1] - pos[0]).Mag());
-                                hist_deltaT_4R54.Fill(Delta_T);
-                            } else if ((pos[0].Mag() <= 4000.0) && (pos[1].Mag() <= 4000.0)) {
-                                hist_prompt_E_R4.Fill(E[0]);
-                                hist_delayed_E_R4.Fill(E[1]);
-                                hist_prompt_Nhits_R4.Fill(Nhits[0]);
-                                hist_delayed_Nhits_R4.Fill(Nhits[1]);
-                                hist_deltaR_R4.Fill((pos[1] - pos[0]).Mag());
-                                hist_deltaT_R4.Fill(Delta_T);
-                            } else {
-                                hist_prompt_E_rest.Fill(E[0]);
-                                hist_delayed_E_rest.Fill(E[1]);
-                                hist_prompt_Nhits_rest.Fill(Nhits[0]);
-                                hist_delayed_Nhits_rest.Fill(Nhits[1]);
-                                hist_deltaR_rest.Fill((pos[1] - pos[0]).Mag());
-                                hist_deltaT_rest.Fill(Delta_T);
+                            if ((pos[0].Mag() < 4000.0) && (pos[1].Mag() < 4000.0)) {
+                                std::cout << "Inner AV event from file " << fileNames.at(i) << ", delayed entry # " << iEntry << " and delayed event # " << iEV << "." << std::endl;
                             }
                         }
                     }
+
+                    // E cuts, no R cut, no pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], false, false)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, false, false, false)) {
+                            hist_prompt_E_ECut_noRcut_noPosDepCorr.Fill(E[0]);
+                            hist_delayed_E_ECut_noRcut_noPosDepCorr.Fill(E[1]);
+                            hist_prompt_R_ECut_noRcut_noPosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_ECut_noRcut_noPosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_ECut_noRcut_noPosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_ECut_noRcut_noPosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_ECut_noRcut_noPosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_ECut_noRcut_noPosDepCorr.Fill(Delta_T);
+                        }
+                    }
+
+                    // nhit cuts, R cut, no pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], true, true)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, false, true, true)) {
+                            hist_prompt_E_NhitCut_Rcut_noPosDepCorr.Fill(E[0]);
+                            hist_delayed_E_NhitCut_Rcut_noPosDepCorr.Fill(E[1]);
+                            hist_prompt_R_NhitCut_Rcut_noPosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_NhitCut_Rcut_noPosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_NhitCut_Rcut_noPosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_NhitCut_Rcut_noPosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_NhitCut_Rcut_noPosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_NhitCut_Rcut_noPosDepCorr.Fill(Delta_T);
+                        }
+                    }
+
+                    // E cuts, R cut, no pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], false, true)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, false, false, true)) {
+                            hist_prompt_E_ECut_Rcut_noPosDepCorr.Fill(E[0]);
+                            hist_delayed_E_ECut_Rcut_noPosDepCorr.Fill(E[1]);
+                            hist_prompt_R_ECut_Rcut_noPosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_ECut_Rcut_noPosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_ECut_Rcut_noPosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_ECut_Rcut_noPosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_ECut_Rcut_noPosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_ECut_Rcut_noPosDepCorr.Fill(Delta_T);
+                        }
+                    }
+                }
+
+                if (get_recon_info(E, times, pos, Nhits, 1, rEV, e_cal, stateCorr, is_data, true)) {
+                    // nhit cuts, no R cut, pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], true, false)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, true, true, false)) {
+                            hist_prompt_E_NhitCut_noRcut_PosDepCorr.Fill(E[0]);
+                            hist_delayed_E_NhitCut_noRcut_PosDepCorr.Fill(E[1]);
+                            hist_prompt_R_NhitCut_noRcut_PosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_NhitCut_noRcut_PosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_NhitCut_noRcut_PosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_NhitCut_noRcut_PosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_NhitCut_noRcut_PosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_NhitCut_noRcut_PosDepCorr.Fill(Delta_T);
+                        }
+                    }
+
+                    // E cuts, no R cut, pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], false, false)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, true, false, false)) {
+                            hist_prompt_E_ECut_noRcut_PosDepCorr.Fill(E[0]);
+                            hist_delayed_E_ECut_noRcut_PosDepCorr.Fill(E[1]);
+                            hist_prompt_R_ECut_noRcut_PosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_ECut_noRcut_PosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_ECut_noRcut_PosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_ECut_noRcut_PosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_ECut_noRcut_PosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_ECut_noRcut_PosDepCorr.Fill(Delta_T);
+                        }
+                    }
+
+                    // nhit cuts, R cut, pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], true, true)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, true, true, true)) {
+                            hist_prompt_E_NhitCut_Rcut_PosDepCorr.Fill(E[0]);
+                            hist_delayed_E_NhitCut_Rcut_PosDepCorr.Fill(E[1]);
+                            hist_prompt_R_NhitCut_Rcut_PosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_NhitCut_Rcut_PosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_NhitCut_Rcut_PosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_NhitCut_Rcut_PosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_NhitCut_Rcut_PosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_NhitCut_Rcut_PosDepCorr.Fill(Delta_T);
+                        }
+                    }
+
+                    // E cuts, R cut, pos dep corr
+                    if (pass_delayed_cuts(E[1], Nhits[1], pos[1], false, true)) {
+                        // Loop over previous events for one that passes prompt and tag cuts (stops after time diff exceeds cut, or max loops)
+                        if (find_prompt_event(dsReader, iEntry, iEV, E, times, pos, Nhits, Delta_T, t_res_file, fTRCalc, e_cal, stateCorr, is_data, verbose, true, false, true)) {
+                            hist_prompt_E_ECut_Rcut_PosDepCorr.Fill(E[0]);
+                            hist_delayed_E_ECut_Rcut_PosDepCorr.Fill(E[1]);
+                            hist_prompt_R_ECut_Rcut_PosDepCorr.Fill(pos[0].Mag());
+                            hist_delayed_R_ECut_Rcut_PosDepCorr.Fill(pos[1].Mag());
+                            hist_prompt_Nhits_ECut_Rcut_PosDepCorr.Fill(Nhits[0]);
+                            hist_delayed_Nhits_ECut_Rcut_PosDepCorr.Fill(Nhits[1]);
+                            hist_deltaR_ECut_Rcut_PosDepCorr.Fill((pos[1] - pos[0]).Mag());
+                            hist_deltaT_ECut_Rcut_PosDepCorr.Fill(Delta_T);
+                        }
+                    }
+                    
                 }
             }
         }
@@ -310,47 +428,85 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
     //now write everything
     rootfile.cd();
 
-    hist_prompt_E.Write();
-    hist_delayed_E.Write();
-    hist_prompt_Nhits.Write();
-    hist_delayed_Nhits.Write();
-    hist_prompt_R.Write();
-    hist_delayed_R.Write();
-    hist_deltaR.Write();
-    hist_deltaT.Write();
+    // nhit cuts, no R cut, no pos dep corr
+    hist_prompt_E_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_delayed_E_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_prompt_R_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_delayed_R_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_prompt_Nhits_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_delayed_Nhits_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_deltaR_NhitCut_noRcut_noPosDepCorr.Write();
+    hist_deltaT_NhitCut_noRcut_noPosDepCorr.Write();
 
-    hist_prompt_E_54R.Write();
-    hist_delayed_E_54R.Write();
-    hist_prompt_Nhits_54R.Write();
-    hist_delayed_Nhits_54R.Write();
-    hist_deltaR_54R.Write();
-    hist_deltaT_54R.Write();
-    
-    hist_prompt_E_4R54.Write();
-    hist_delayed_E_4R54.Write();
-    hist_prompt_Nhits_4R54.Write();
-    hist_delayed_Nhits_4R54.Write();
-    hist_deltaR_4R54.Write();
-    hist_deltaT_4R54.Write();
+    // E cuts, no R cut, no pos dep corr
+    hist_prompt_E_ECut_noRcut_noPosDepCorr.Write();
+    hist_delayed_E_ECut_noRcut_noPosDepCorr.Write();
+    hist_prompt_R_ECut_noRcut_noPosDepCorr.Write();
+    hist_delayed_R_ECut_noRcut_noPosDepCorr.Write();
+    hist_prompt_Nhits_ECut_noRcut_noPosDepCorr.Write();
+    hist_delayed_Nhits_ECut_noRcut_noPosDepCorr.Write();
+    hist_deltaR_ECut_noRcut_noPosDepCorr.Write();
+    hist_deltaT_ECut_noRcut_noPosDepCorr.Write();
 
-    hist_prompt_E_R4.Write();
-    hist_delayed_E_R4.Write();
-    hist_prompt_Nhits_R4.Write();
-    hist_delayed_Nhits_R4.Write();
-    hist_deltaR_R4.Write();
-    hist_deltaT_R4.Write();
+    // nhit cuts, R cut, no pos dep corr
+    hist_prompt_E_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_delayed_E_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_prompt_R_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_delayed_R_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_prompt_Nhits_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_delayed_Nhits_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_deltaR_NhitCut_Rcut_noPosDepCorr.Write();
+    hist_deltaT_NhitCut_Rcut_noPosDepCorr.Write();
 
-    hist_prompt_E_rest.Write();
-    hist_delayed_E_rest.Write();
-    hist_prompt_Nhits_rest.Write();
-    hist_delayed_Nhits_rest.Write();
-    hist_deltaR_rest.Write();
-    hist_deltaT_rest.Write();
+    // E cuts, R cut, no pos dep corr
+    hist_prompt_E_ECut_Rcut_noPosDepCorr.Write();
+    hist_delayed_E_ECut_Rcut_noPosDepCorr.Write();
+    hist_prompt_R_ECut_Rcut_noPosDepCorr.Write();
+    hist_delayed_R_ECut_Rcut_noPosDepCorr.Write();
+    hist_prompt_Nhits_ECut_Rcut_noPosDepCorr.Write();
+    hist_delayed_Nhits_ECut_Rcut_noPosDepCorr.Write();
+    hist_deltaR_ECut_Rcut_noPosDepCorr.Write();
+    hist_deltaT_ECut_Rcut_noPosDepCorr.Write();
 
-    hist_prompt_E_vs_R.Write();
-    hist_delayed_E_vs_R.Write();
-    hist_prompt_Nhits_vs_R.Write();
-    hist_delayed_Nhits_vs_R.Write();
+    // nhit cuts, no R cut, pos dep corr
+    hist_prompt_E_NhitCut_noRcut_PosDepCorr.Write();
+    hist_delayed_E_NhitCut_noRcut_PosDepCorr.Write();
+    hist_prompt_R_NhitCut_noRcut_PosDepCorr.Write();
+    hist_delayed_R_NhitCut_noRcut_PosDepCorr.Write();
+    hist_prompt_Nhits_NhitCut_noRcut_PosDepCorr.Write();
+    hist_delayed_Nhits_NhitCut_noRcut_PosDepCorr.Write();
+    hist_deltaR_NhitCut_noRcut_PosDepCorr.Write();
+    hist_deltaT_NhitCut_noRcut_PosDepCorr.Write();
+
+    // E cuts, no R cut, pos dep corr
+    hist_prompt_E_ECut_noRcut_PosDepCorr.Write();
+    hist_delayed_E_ECut_noRcut_PosDepCorr.Write();
+    hist_prompt_R_ECut_noRcut_PosDepCorr.Write();
+    hist_delayed_R_ECut_noRcut_PosDepCorr.Write();
+    hist_prompt_Nhits_ECut_noRcut_PosDepCorr.Write();
+    hist_delayed_Nhits_ECut_noRcut_PosDepCorr.Write();
+    hist_deltaR_ECut_noRcut_PosDepCorr.Write();
+    hist_deltaT_ECut_noRcut_PosDepCorr.Write();
+
+    // nhit cuts, R cut, pos dep corr
+    hist_prompt_E_NhitCut_Rcut_PosDepCorr.Write();
+    hist_delayed_E_NhitCut_Rcut_PosDepCorr.Write();
+    hist_prompt_R_NhitCut_Rcut_PosDepCorr.Write();
+    hist_delayed_R_NhitCut_Rcut_PosDepCorr.Write();
+    hist_prompt_Nhits_NhitCut_Rcut_PosDepCorr.Write();
+    hist_delayed_Nhits_NhitCut_Rcut_PosDepCorr.Write();
+    hist_deltaR_NhitCut_Rcut_PosDepCorr.Write();
+    hist_deltaT_NhitCut_Rcut_PosDepCorr.Write();
+
+    // E cuts, R cut, pos dep corr
+    hist_prompt_E_ECut_Rcut_PosDepCorr.Write();
+    hist_delayed_E_ECut_Rcut_PosDepCorr.Write();
+    hist_prompt_R_ECut_Rcut_PosDepCorr.Write();
+    hist_delayed_R_ECut_Rcut_PosDepCorr.Write();
+    hist_prompt_Nhits_ECut_Rcut_PosDepCorr.Write();
+    hist_delayed_Nhits_ECut_Rcut_PosDepCorr.Write();
+    hist_deltaR_ECut_Rcut_PosDepCorr.Write();
+    hist_deltaT_ECut_Rcut_PosDepCorr.Write();
 
     rootfile.Write();
     rootfile.Close();
@@ -378,7 +534,7 @@ void make_hists(const std::vector<std::string>& fileNames, const std::string out
  */
 bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int evt, std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<double>& Nhits,
                        double& Delta_T, std::ofstream& t_res_file, RAT::DU::TimeResidualCalculator& fTRCalc, const RAT::DU::ReconCalibrator& e_cal, RAT::DU::DetectorStateCorrection& stateCorr,
-                       bool is_data, const bool verbose, const std::string fitName) {
+                       bool is_data, const bool verbose, const bool use_pos_dep_corr, const bool use_Nhit, const bool cut_R_min) {
 
     RAT::DS::Entry rDS = dsReader.GetEntry(entry);
     RAT::DS::EV rEV = rDS.GetEV(evt);
@@ -398,18 +554,20 @@ bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int e
             rEV = rDS.GetEV(iEV);
 
             // Get recon info, if it exists
-            if (get_recon_info(E, times, pos, Nhits, 0, rEV, e_cal, stateCorr, is_data, fitName)) {
+            if (get_recon_info(E, times, pos, Nhits, 0, rEV, e_cal, stateCorr, is_data, use_pos_dep_corr)) {
                 if (verbose) std::cout << "rEV.GetClockCount50() = " << rEV.GetClockCount50() << std::endl;
                 Delta_T = ((int64_t(delayed_50MHz_time) - int64_t(rEV.GetClockCount50())) & 0x7FFFFFFFFFF) * 20.0;
                 if (verbose) std::cout << "Delta_T = " << Delta_T << std::endl;
 
                 if (Delta_T > MAX_DELAY) return false;
 
-                if (pass_prompt_cuts(E[0], Nhits[0], pos[0])) {
+                if (pass_prompt_cuts(E[0], Nhits[0], pos[0], use_Nhit, cut_R_min)) {
                     if (verbose) std::cout << "Passed prompt cuts! Checking coincidence cuts..." << std::endl;
                     if (pass_coincidence_cuts(Delta_T, pos[0], pos[1])) {
-                        // Also get time residuals while at it
-                        get_t_res(t_res_file, rEV, fTRCalc, pos[0], times[0]);
+                        #ifdef PRINT_T_RES
+                            // Also get time residuals while at it
+                            get_t_res(t_res_file, rEV, fTRCalc, pos[0], times[0]);
+                        #endif
                         return true;
                     }
                 }
@@ -436,13 +594,11 @@ bool find_prompt_event(RAT::DU::DSReader& dsReader, const int entry, const int e
  */
 bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vector<TVector3>& pos, std::vector<double>& Nhits,
                     const unsigned int idx, const RAT::DS::EV& evt, const RAT::DU::ReconCalibrator& e_cal, RAT::DU::DetectorStateCorrection& stateCorr,
-                    bool is_data, std::string fitName) {
+                    bool is_data, const bool use_pos_dep_corr) {
 
-    // Grab the fit information
-    if (fitName == "") fitName = evt.GetDefaultFitName();
     try {
         // Get recon info
-        const RAT::DS::FitResult fitResult = evt.GetFitResult(fitName);
+        const RAT::DS::FitResult fitResult = evt.GetFitResult(evt.GetDefaultFitName());
         if (!fitResult.GetValid()) return false; // fit invalid
         const RAT::DS::FitVertex& rVertex = fitResult.GetVertex(0);
         if (!(rVertex.ValidPosition() && rVertex.ValidTime() && rVertex.ValidEnergy())) return false; // fit invalid
@@ -459,8 +615,12 @@ bool get_recon_info(std::vector<double>& E, std::vector<double>& times, std::vec
         double E_corr = stateCorr.GetCorrectionPos(position, 0, 0) / stateCorr.GetCorrection(7733, 0.768972); // a correction factor (divide E by it)
 
         // Apply corrections: also scale the Nhits by the same amount, for consistency (and in case Nhits are used for cuts)
-        Nhits[idx] *= (corrected_energy / E[idx]) / E_corr;
-        E[idx] = corrected_energy / E_corr;
+        Nhits[idx] *= corrected_energy / E[idx];
+        E[idx] = corrected_energy;
+        if (use_pos_dep_corr) {
+            Nhits[idx] /= E_corr;
+            E[idx] /= E_corr;
+        }
     }
     catch (const RAT::DS::DataNotFound&) {return false;}  // no fit data
     catch (const RAT::DS::FitCollection::NoResultError&) {return false;} // no fit result by the name of fitName
