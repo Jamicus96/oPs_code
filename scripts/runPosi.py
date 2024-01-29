@@ -46,7 +46,7 @@ def argparser():
     parser.add_argument('---flat', '-f', type=bool, dest='flat',
                         default=False, help='True if you want to also produce the same histograms, but where the prompt E spectra have been flattened.')
     parser.add_argument('---is_data', '-iD', type=bool, dest='is_data',
-                        default=False, help='For energy correction: True for data, False for MC.')
+                        default=True, help='For energy correction: True for data, False for MC.')
     
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                         default=False, help='print and save extra info')
