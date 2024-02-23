@@ -18,14 +18,14 @@ def argparser():
 
     parser.add_argument('--sim_repo', '-sr', type=str, dest='sim_repo',
                         # default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15/sims/', help='Folder to save intial root files from simulations in.')
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/Analysis_data/AmBe/RAT7.0.15/', help='Folder to save intial root files from simulations in.')
-                        # default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/RAT7.0.15/', help='Folder to save intial root files from simulations in.')
+                        # default='/mnt/lustre/scratch/epp/jp643/antinu/Analysis_data/AmBe/RAT7.0.15/', help='Folder to save intial root files from simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/MC_data/AmBe/RAT7.0.15/', help='Folder to save intial root files from simulations in.')
     parser.add_argument('--info_repo', '-ir', type=str, dest='info_repo',
                         default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15/info/', help='Folder to save info text files in.')
     parser.add_argument('--hist_repo', '-hr', type=str, dest='hist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_Nhit/hists/', help='Folder to save hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_MC/hists/', help='Folder to save hist root files in.')
     parser.add_argument('--tothist_repo', '-tr', type=str, dest='tothist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_Nhit/tothists/', help='Folder to save combined total hist root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/antinu/AmBe/RAT7.0.15_MC/tothists/', help='Folder to save combined total hist root files in.')
     
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=200000, help='Number of events to simulate for each setting, total')
@@ -46,7 +46,7 @@ def argparser():
     parser.add_argument('---flat', '-f', type=bool, dest='flat',
                         default=False, help='True if you want to also produce the same histograms, but where the prompt E spectra have been flattened.')
     parser.add_argument('---is_data', '-iD', type=bool, dest='is_data',
-                        default=True, help='For energy correction: True for data, False for MC.')
+                        default=False, help='For energy correction: True for data, False for MC.')
     
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                         default=False, help='print and save extra info')
